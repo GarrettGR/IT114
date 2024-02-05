@@ -13,15 +13,27 @@ public class Problem3 {
         bePositive(a3);
         bePositive(a4);
     }
+
     // <T> turns this into a generic so it can take in any datatype, it'll be passed as an Object so casting is required
     static <T> void bePositive(T[] arr){
         System.out.println("Processing Array:" + Arrays.toString(arr));
+
         //your code should set the indexes of this array
         Object[] output = new Object[arr.length];
         //hint: use the arr variable; don't diretly use the a1-a4 variables
-        //TODO convert each value to positive
+        
         //set the result to the proper index of the output array
         //hint: don't forget to handle the data types properly, the result datatype should be the same as the original datatype
+
+        for (int i = 0; i < arr.length; i++) {
+            if (arr[i] instanceof Integer) {
+                output[i] = Math.abs((Integer) arr[i]);
+            } else if (arr[i] instanceof Double) {
+                output[i] = Math.abs((Double) arr[i]);
+            } else if (arr[i] instanceof String) {
+                output[i] = String.valueOf(Math.abs(Integer.parseInt((String) arr[i])));
+            }
+        }
         
         //end edit section
 
