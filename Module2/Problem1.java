@@ -19,12 +19,13 @@ public class Problem1 {
         System.out.println("Odds output:");
         // hint: use the arr variable; don't diretly use the a1-a4 variables
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("Processed Array: [");
-        for (int num : arr)
-            if (num % 2 != 0)
-                sb.append(num).append(", ");
-        sb.replace(sb.length() - 2, sb.length(), "]");
+        // grg 2-5-24
+        StringBuilder sb = new StringBuilder(); // creates a new StringBuilder object
+        sb.append("Processed Array: ["); // starts the string that will be returned
+        for (int num : arr) // loops through the input array (for each)
+            if (num % 2 != 0) // excecutes if the number is odd
+                sb.append(num).append(", "); // appends the number to the string and adds a comma and space
+        sb.replace(sb.length() - 2, sb.length(), "]"); // replaces the last comma and space with a closing bracket
         System.out.println(sb.toString());
 
         // end add/edit section
