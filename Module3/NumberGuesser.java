@@ -158,10 +158,12 @@ public class NumberGuesser {
             System.out.println("Welcome to NumberGuesser4.0");
             System.out.println("To exit, type the word 'quit'.\n");
 
+            // grg : 2-12-24
             System.out.println("Please enter your name:");
             String name = input.nextLine();
             this.fileName = name + ".txt";
 
+            // grg : 2-12-24
             System.out.println("\nEnter the letter for the difficulty level you wish to play - (e)asy, (m)edium, or (h)ard:");
             String difficulty = input.nextLine().substring(0, 1);
 
