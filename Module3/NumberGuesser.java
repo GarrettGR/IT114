@@ -11,7 +11,7 @@ public class NumberGuesser {
     private int maxLevel = 1;
     private int level = 1;
     private int strikes = 0;
-    private int maxStrikes = 5;
+    private int maxStrikes;
     private int number = -1;
     private boolean pickNewRandom = true;
     private Random random = new Random();
@@ -161,6 +161,25 @@ public class NumberGuesser {
             System.out.println("Please enter your name:");
             String name = input.nextLine();
             this.fileName = name + ".txt";
+
+            System.out.println("\nEnter the letter for the difficulty level you wish to play - (e)asy, (m)edium, or (h)ard:");
+            String difficulty = input.nextLine().substring(0, 1);
+
+            switch (difficulty) {
+                case "e":
+                    maxStrikes = 10;
+                    break;
+                case "m":
+                    maxStrikes = 5;
+                    break;
+                case "h":
+                    maxStrikes = 3;
+                    break;
+                default:
+                    maxStrikes = 5;
+                    break;
+            }
+            System.out.println("You will have " + maxStrikes + " strikes for each level. Good luck!\n");
 
             loadState();
             do {
