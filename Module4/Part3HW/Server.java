@@ -67,10 +67,6 @@ public class Server {
         }
     }
 
-    protected synchronized void privateMessage(String message) {
-        broadcast(message, "Server");
-    }
-
     private ServerThread getClient(String userName) {
         for (ServerThread client : clients) {
             if (client.getUserName().equals(userName)) {
@@ -118,6 +114,7 @@ public class Server {
             broadcast(String.format("Server: %s renamed to %s", userName, newName), newName);
             return true;
         } else if (message.toLowerCase().startsWith("/pm ")) {
+            // grg -- 2-19-24
             String parts[] = message.substring(4).split(" +");
             List<String> targets = new ArrayList<String>();
             StringBuilder privMsg = new StringBuilder();
@@ -136,9 +133,7 @@ public class Server {
             } else if (parts.length < 2) {
                 client.send("Server: The command was not formatted correctly");
                 return true;
-            }
-
-            if (targets.isEmpty()) {
+            } else if (targets.isEmpty()) {
                 client.send("Server: No targets provided");
                 return true;
             }
@@ -147,7 +142,23 @@ public class Server {
                 ServerThread clnt = getClient(target);
 
                 if (clnt != null) {
-                    clnt.send(String.format("Private message from %s: %s", userName, privMsg));
+                    if (clnt.getUserName().equals(userName)) {
+                        client.send("Server: You cannot send a private message to yourself");
+                        continue;
+                    } else if (clnt.getUserName().equals("Server")) {
+                        client.send("Server: You cannot send a private message to the server");
+                        continue;
+                    } else if (targets.size() > 1) {
+                        String target_users = "";
+                        for (String target_user : targets) {
+                            target_users += target_user + ", ";
+                        }
+                        target_users = target_users += userName;
+                        clnt.send(String.format("\nPrivate message with %s\n%s: %s", target_users, userName, privMsg));
+                    } else if (targets.size() == 1) {
+                        clnt.send(String.format("Private message from %s: %s", userName, privMsg));
+                    }
+
                 } else {
                     client.send(String.format("Server: %s is not connected", target));
                 }
@@ -155,8 +166,8 @@ public class Server {
 
             return true;
         } else if (message.toLowerCase().startsWith("/shuffle ")) {
+            // grg -- 2-19-24
             String input = message.substring(9);
-            System.out.println("Shuffling: " + input);
             List<Character> chars = new ArrayList<Character>();
             StringBuilder output = new StringBuilder(input.length());
 
