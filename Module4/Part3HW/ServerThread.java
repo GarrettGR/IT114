@@ -1,5 +1,6 @@
 package Module4.Part3HW;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -11,12 +12,12 @@ import java.net.Socket;
 public class ServerThread extends Thread {
     private Socket client;
     private boolean isRunning = false;
-    private ObjectOutputStream out;//exposed here for send()
+    private ObjectOutputStream out;// exposed here for send()
     private Server server;// ref to our server so we can call methods on it
     // more easily
 
     private void info(String message) {
-        System.out.println(String.format("Thread[%s]: %s", getId(), message));
+        System.out.println(String.format("Thread[%s]: %s", threadId(), message));
     }
 
     public ServerThread(Socket myClient, Server server) {
@@ -55,14 +56,18 @@ public class ServerThread extends Thread {
             this.out = out;
             isRunning = true;
             String fromClient;
-            while (isRunning && // flag to let us easily control the loop
-                    (fromClient = (String) in.readObject()) != null // reads an object from inputStream (null would
-                                                                    // likely mean a disconnect)
-            ) {
-
-                info("Received from client: " + fromClient);
-                server.broadcast(fromClient, this.getId());
-            } // close while loop
+            try{    
+                while (isRunning && // flag to let us easily control the loop
+                    (fromClient = (String) in.readObject()) != null ) { // reads an object from inputStream (null would // likely mean a disconnect)
+                    info("Received from client: " + fromClient);
+                    server.broadcast(fromClient, this.threadId());
+                } // close while loop
+            } catch (EOFException e) {
+                info("Client disconnected");
+            } catch (IOException e) {
+                info("Error reading from client");
+                e.printStackTrace();
+            }
         } catch (Exception e) {
             // happens when client disconnects
             e.printStackTrace();
