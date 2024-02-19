@@ -11,6 +11,7 @@ public class Server {
     int port = 3000;
 
     private List<ServerThread> clients = new ArrayList<ServerThread>();
+    private int clientNum = 0;
 
     private void start(int port) {
         this.port = port;
@@ -21,7 +22,7 @@ public class Server {
                 System.out.println("waiting for next client");
                 if (incoming_client != null) {
                     System.out.println("Client connected");
-                    ServerThread sClient = new ServerThread(incoming_client, this);
+                    ServerThread sClient = new ServerThread(incoming_client, this, "User" + clientNum++);
                     clients.add(sClient);
                     sClient.start();
                     incoming_client = null;
@@ -36,44 +37,144 @@ public class Server {
     }
 
     protected synchronized void disconnect(ServerThread client) {
-        long id = client.threadId();
+        String userName = client.getUserName();
         client.disconnect();
-        broadcast("Disconnected", id);
+        broadcast("Disconnected", userName);
     }
 
-    protected synchronized void broadcast(String message, long id) {
+    protected synchronized void broadcast(String message, String userName) {
 
-        if (processCommand(message, id)) {
-            // TODO: handle commands
+        if (processCommand(message, userName)) {
             return;
         }
 
-        // message = String.format("User[%d]: %s", id, message); // do I want it to log all the messages?
+        if (!message.startsWith("Server:")) {
+            message = String.format("%s: %s", userName, message);
+        }
 
         Iterator<ServerThread> it = clients.iterator();
         while (it.hasNext()) {
             ServerThread client = it.next();
+            if (client.getUserName() == userName) {
+                continue;
+            }
             boolean wasSuccessful = client.send(message);
             if (!wasSuccessful) {
-                System.out.println(String.format("Removing disconnected client[%s] from list", client.threadId()));
+                System.out.println(String.format("Removing disconnected client[%s] from list", client.getUserName()));
                 it.remove();
-                broadcast("Disconnected", id);
+                broadcast("Disconnected", userName);
             }
         }
     }
 
-    private boolean processCommand(String message, long clientId) {
-        System.out.println("Processing input: " + message);
-        if (message.equalsIgnoreCase("disconnect")) {
-            Iterator<ServerThread> it = clients.iterator();
-            while (it.hasNext()) {
-                ServerThread client = it.next();
-                if (client.threadId() == clientId) {
-                    it.remove();
-                    disconnect(client);
-                    break;
+    protected synchronized void privateMessage(String message) {
+        broadcast(message, "Server");
+    }
+
+    private ServerThread getClient(String userName) {
+        for (ServerThread client : clients) {
+            if (client.getUserName().equals(userName)) {
+                return client;
+            }
+        }
+        return null;
+    }
+
+    private boolean processCommand(String message, String userName) {
+        ServerThread client = getClient(userName);
+
+        if (message.equalsIgnoreCase("/disconnect")) {
+            clients.remove(client);
+            disconnect(client);
+            return true;
+        } else if (message.equalsIgnoreCase("/users")) {
+            String list = "Server: ";
+            for (ServerThread clnt : clients) {
+                list += clnt.getUserName() + ", ";
+            }
+            list = list.substring(0, list.length() - 2);
+            client.send(list);
+            return true;
+        } else if (message.toLowerCase().startsWith("/rename ")) {
+
+            String newName = message.split(" +")[1];
+
+            String unavailable[] = new String[clients.size() + 4];
+            clients.forEach(clnt -> unavailable[clients.indexOf(clnt)] = clnt.getUserName());
+            unavailable[clients.size()] = "Server";
+            unavailable[clients.size() + 1] = "User" + clientNum;
+            unavailable[clients.size() + 2] = "Thread";
+            unavailable[clients.size() + 3] = "Client";
+
+            for (String name : unavailable) {
+                if (newName.equalsIgnoreCase(name)) {
+                    client.send(String.format("%s: %s", "Server", "Name already in use"));
+                    return true;
                 }
             }
+
+            client.setUserName(newName);
+            client.send(String.format("%s: %s", "Server", "Renamed to " + newName));
+            broadcast(String.format("Server: %s renamed to %s", userName, newName), newName);
+            return true;
+        } else if (message.toLowerCase().startsWith("/pm ")) {
+            String parts[] = message.substring(4).split(" +");
+            List<String> targets = new ArrayList<String>();
+            StringBuilder privMsg = new StringBuilder();
+
+            for (String part : parts) {
+                if (part.startsWith("@")) {
+                    targets.add(part.substring(1));
+                } else if (!part.startsWith("@")) {
+                    privMsg.append(part + " ");
+                }
+            }
+
+            if (privMsg.length() == 0) {
+                client.send("Server: No message provided");
+                return true;
+            } else if (parts.length < 2) {
+                client.send("Server: The command was not formatted correctly");
+                return true;
+            }
+
+            if (targets.isEmpty()) {
+                client.send("Server: No targets provided");
+                return true;
+            }
+
+            for (String target : targets) {
+                ServerThread clnt = getClient(target);
+
+                if (clnt != null) {
+                    clnt.send(String.format("Private message from %s: %s", userName, privMsg));
+                } else {
+                    client.send(String.format("Server: %s is not connected", target));
+                }
+            }
+
+            return true;
+        } else if (message.toLowerCase().startsWith("/shuffle ")) {
+            String input = message.substring(9);
+            System.out.println("Shuffling: " + input);
+            List<Character> chars = new ArrayList<Character>();
+            StringBuilder output = new StringBuilder(input.length());
+
+            if (input.length() < 2) {
+                client.send("Server: Not enough characters to shuffle");
+                return true;
+            }
+
+            for (char c : input.toCharArray()) {
+                chars.add(c);
+            }
+            while (chars.size() != 0) {
+                int rand = (int) (Math.random() * chars.size());
+                output.append(chars.remove(rand));
+            }
+
+            client.send("Server: your shuffled message: " + output.toString());
+            broadcast(output.toString(), userName);
             return true;
         }
         return false;

@@ -18,6 +18,21 @@ public class Client {
     public static final String ANSI_RESET = "\u001B[0m";
     public static final String ANSI_YELLOW = "\u001B[33m";
     public static final String ANSI_RED = "\u001B[31m";
+    public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
+    public static final String UNIX_CLEAR = "\033[H\033[2J";
+
+    public static final String HELP = """
+            /connect [ip address]:[port] - Connect to a server
+            /connect localhost:[port] - Connect to a server on localhost
+            /disconnect - Disconnect from the server
+            /rename [username] - Change username
+            /users - List users in the chat
+            /pm @[username] ... @[username] [message] - Send a private message
+            /shuffle [message] - randomize the order of characters in a message
+            /clear - Clear the console
+            /quit - Exit the program
+            /help - Show this help message
+            """;
 
     boolean isRunning = false;
     private Thread inputThread;
@@ -27,12 +42,20 @@ public class Client {
         system_print("Client created");
     }
 
+    public static void server_print(String message) {
+        if (message.startsWith("Server:")) {
+            System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
+        } else {
+            System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
+        }
+    }
+
     public static void system_print(String message) {
         System.out.println(ANSI_YELLOW + message + ANSI_RESET);
     }
 
     public static void system_error(String message) {
-        System.err.println(ANSI_RED + message + ANSI_RESET);
+        System.out.println(ANSI_RED + message + ANSI_RESET);
     }
 
     public boolean isConnected() {
@@ -59,6 +82,7 @@ public class Client {
             in = new ObjectInputStream(server.getInputStream()); // channel to listen to server
 
             system_print("Client connected");
+
             listenForServerMessage();
         } catch (UnknownHostException e) {
             // e.printStackTrace();
@@ -85,7 +109,7 @@ public class Client {
     }
 
     private boolean isQuit(String text) {
-        return text.equalsIgnoreCase("quit");
+        return text.equalsIgnoreCase("/quit");
     }
 
     /**
@@ -103,6 +127,14 @@ public class Client {
         } else if (isQuit(text)) {
             isRunning = false;
             return true;
+        } else if (text.equalsIgnoreCase("/clear")) {
+            System.out.print(UNIX_CLEAR);
+            System.out.flush();
+            system_print("Console cleared");
+            return true;
+        } else if (text.equalsIgnoreCase("/help")) {
+            system_print(HELP);
+            return true;
         }
         return false;
     }
@@ -111,7 +143,7 @@ public class Client {
         inputThread = new Thread() {
             @Override
             public void run() {
-                system_print("Listening for input");
+                system_print("Enter /help to see a list of commands");
                 try (Scanner si = new Scanner(System.in);) {
                     String line = "";
                     isRunning = true;
@@ -151,7 +183,7 @@ public class Client {
                     String fromServer;
                     while (!server.isClosed() && !server.isInputShutdown()
                             && (fromServer = (String) in.readObject().toString()) != null) {
-                        System.out.println(fromServer);
+                        server_print(fromServer);
                     }
                     system_print("Loop exited");
                 } catch (Exception e) {
@@ -188,32 +220,32 @@ public class Client {
             // e.printStackTrace();
         }
         try {
-            System.out.println("Closing output stream");
+            system_print("Closing output stream");
             out.close();
         } catch (NullPointerException ne) {
-            System.out.println("Server was never opened so this exception is ok");
+            system_print("Server was never opened so this exception is ok");
         } catch (Exception e) {
             system_error("Error closing output stream");
             // e.printStackTrace();
         }
         try {
-            System.out.println("Closing input stream");
+            system_print("Closing input stream");
             in.close();
         } catch (NullPointerException ne) {
-            System.out.println("Server was never opened so this exception is ok");
+            system_error("Server was never opened so this exception is ok");
         } catch (Exception e) {
-            system_error("Error closing input stream");
+            system_error("Error closing input ");
             // e.printStackTrace();
         }
         try {
-            System.out.println("Closing connection");
+            system_print("Closing connection");
             server.close();
-            System.out.println("Closed socket");
+            system_print("Closed socket");
         } catch (IOException e) {
             system_error("Error closing socket");
             // e.printStackTrace();
         } catch (NullPointerException ne) {
-            System.out.println("Server was never opened so this exception is ok");
+            system_error("Server was never opened so this exception is ok");
         }
     }
 

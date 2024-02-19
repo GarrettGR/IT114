@@ -11,21 +11,21 @@ import java.net.Socket;
  */
 public class ServerThread extends Thread {
     private Socket client;
+    private String userName;
     private boolean isRunning = false;
-    private ObjectOutputStream out;// exposed here for send()
-    private Server server;// ref to our server so we can call methods on it
-    // more easily
+    private ObjectOutputStream out;
+    private Server server;
 
     private void info(String message) {
-        System.out.println(String.format("Thread[%s]: %s", threadId(), message));
+        System.out.println(String.format("Thread[%s]: %s", this.userName, message));
     }
 
-    public ServerThread(Socket myClient, Server server) {
+    public ServerThread(Socket myClient, Server server, String userName) {
         info("Thread created");
         // get communication channels to single client
         this.client = myClient;
         this.server = server;
-
+        this.userName = userName;
     }
 
     public void disconnect() {
@@ -35,17 +35,23 @@ public class ServerThread extends Thread {
     }
 
     public boolean send(String message) {
-        // added a boolean so we can see if the send was successful
         try {
             out.writeObject(message);
             return true;
         } catch (IOException e) {
             info("Error sending message to client (most likely disconnected)");
-            // comment this out to inspect the stack trace
             // e.printStackTrace();
             cleanup();
             return false;
         }
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getUserName() {
+        return userName;
     }
 
     @Override
@@ -56,12 +62,11 @@ public class ServerThread extends Thread {
             this.out = out;
             isRunning = true;
             String fromClient;
-            try{    
-                while (isRunning && // flag to let us easily control the loop
-                    (fromClient = (String) in.readObject()) != null ) { // reads an object from inputStream (null would // likely mean a disconnect)
+            try {
+                while (isRunning && (fromClient = (String) in.readObject()) != null) {
                     info("Received from client: " + fromClient);
-                    server.broadcast(fromClient, this.threadId());
-                } // close while loop
+                    server.broadcast(fromClient, this.userName);
+                }
             } catch (EOFException e) {
                 info("Client disconnected");
             } catch (IOException e) {
@@ -69,7 +74,6 @@ public class ServerThread extends Thread {
                 e.printStackTrace();
             }
         } catch (Exception e) {
-            // happens when client disconnects
             e.printStackTrace();
             info("Client disconnected");
         } finally {
