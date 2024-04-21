@@ -7,265 +7,260 @@ import java.util.Scanner;
 
 public class Client {
 
-    Socket server = null;
-    ObjectOutputStream out = null;
-    ObjectInputStream in = null;
+  Socket server = null;
+  ObjectOutputStream out = null;
+  ObjectInputStream in = null;
 
-    public static final String ANSI_RESET = "\u001B[0m";
-    public static final String ANSI_YELLOW = "\u001B[33m";
-    public static final String ANSI_RED = "\u001B[31m";
-    public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
-    public static final String UNIX_CLEAR = "\033[H\033[2J";
+  public static final String ANSI_RESET = "\u001B[0m";
+  public static final String ANSI_YELLOW = "\u001B[33m";
+  public static final String ANSI_RED = "\u001B[31m";
+  public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
+  public static final String UNIX_CLEAR = "\033[H\033[2J";
 
-    public static final String HELP = """
-            /connect [ip address]:[port] - Connect to a server
-            /connect localhost:[port] - Connect to a server on localhost
-            /disconnect - Disconnect from the server
-            /rename [username] - Change username
-            /users - List users in the chat
-            /pm @[username] ... @[username] [message] - Send a private message
-            /shuffle [message] - randomize the order of characters in a message
-            /clear - Clear the console
-            /quit - Exit the program
-            /help - Show this help message
-            """;
+  public static final String HELP = """
+      /connect [ip address]:[port] - Connect to a server
+      /connect localhost:[port] - Connect to a server on localhost
+      /disconnect - Disconnect from the server
+      /name [username] - Set or change username
+      /users - List users in the chat
+      /pm @[username] ... @[username] [message] - Send a private message
+      /clear - Clear the console
+      /quit - Exit the program
+      /help - Show this help message
+      """;
 
-    final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
-    final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
-    boolean isRunning = false;
-    private Thread inputThread;
-    private Thread fromServerThread;
-    private String clientName = "";
+  final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
+  final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
+  boolean isRunning = false;
+  private Thread inputThread;
+  private Thread fromServerThread;
+  private String clientName = "";
 
-    public Client() {
-        system_print("Client Created");
+  public Client() { system_print("Client Created"); }
+
+  public boolean isConnected() {
+    if (server == null)
+      return false;
+    return server.isConnected() && !server.isClosed() && !server.isInputShutdown() && !server.isOutputShutdown();
+  }
+
+  private boolean connect(String address, int port) {
+    try {
+      server = new Socket(address, port);
+      out = new ObjectOutputStream(server.getOutputStream());
+      in = new ObjectInputStream(server.getInputStream());
+      system_print("Client connected");
+      listenForServerMessage();
+      sendConnect();
+    } catch (UnknownHostException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
     }
+    return isConnected();
+  }
 
-    public boolean isConnected() {
-        if (server == null)
-            return false;
-        return server.isConnected() && !server.isClosed() && !server.isInputShutdown() && !server.isOutputShutdown();
+  private boolean isConnection(String text) { return text.matches(ipAddressPattern) || text.matches(localhostPattern); }
+
+  private boolean isName(String text) {
+    if (text.startsWith("/name")) {
+      String[] parts = text.split(" ");
+      if (parts.length >= 2) {
+        clientName = parts[1].trim();
+        system_print("Name set to " + clientName);
+      }
+      return true;
     }
+    return false;
+  }
 
-    private boolean connect(String address, int port) {
-        try {
-            server = new Socket(address, port);
-            out = new ObjectOutputStream(server.getOutputStream());
-            in = new ObjectInputStream(server.getInputStream());
-            system_print("Client connected");
-            listenForServerMessage();
-            sendConnect();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return isConnected();
+  private boolean isQuit(String text) { return text.equalsIgnoreCase("/quit"); }
+
+  private boolean isHelp(String text) { return text.equalsIgnoreCase("/help"); }
+
+  private boolean isClear(String text) { return text.equalsIgnoreCase("/clear"); }
+
+  public static void server_print(String message) {
+    if (message.startsWith("Server:")) {
+      System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
+    } else {
+      System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
     }
+  }
 
-    private boolean isConnection(String text) { return text.matches(ipAddressPattern) || text.matches(localhostPattern); }
+  public static void system_print(String message) { System.out.println(ANSI_YELLOW + message + ANSI_RESET); }
 
-    private boolean isName(String text) {
-        if (text.startsWith("/name")) {
-            String[] parts = text.split(" ");
-            if (parts.length >= 2) {
-                clientName = parts[1].trim();
-                system_print("Name set to " + clientName);
-            }
-            return true;
-        }
-        return false;
+  public static void system_error(String message) { System.out.println(ANSI_RED + message + ANSI_RESET); }
+
+  private boolean processCommand(String text) {
+    if (isConnection(text)) {
+      if (clientName.isBlank())
+        system_print("You can set your name by using: /name your_name");
+      String[] parts = text.trim().replaceAll(" +", " ").split(" ")[1].split(":");
+      connect(parts[0].trim(), Integer.parseInt(parts[1].trim()));
+      return true;
+    } else if (isQuit(text)) {
+      isRunning = false;
+      return true;
+    } else if (isName(text)) {
+      return true;
+    } else if (isHelp(text)) {
+      system_print(HELP);
+      return true;
+    } else if (isClear(text)) {
+      System.out.print(UNIX_CLEAR);
+      System.out.flush();
+      system_print("Console cleared");
+      return true;
     }
+    return false;
+  }
 
-    private boolean isQuit(String text) { return text.equalsIgnoreCase("/quit"); }
+  private void sendConnect() throws IOException {
+    Payload p = new Payload();
+    p.setPayloadType(PayloadType.CONNECT);
+    p.setClientName(clientName);
+    out.writeObject(p);
+  }
 
-    private boolean isHelp(String text) { return text.equalsIgnoreCase("/help"); }
+  private void sendMessage(String message) throws IOException {
+    Payload p = new Payload();
+    p.setPayloadType(PayloadType.MESSAGE);
+    p.setMessage(message);
+    p.setClientName(clientName);
+    out.writeObject(p);
+  }
 
-    private boolean isClear(String text) { return text.equalsIgnoreCase("/clear"); }
-
-    public static void server_print(String message) {
-        if (message.startsWith("Server:")) {
-            System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
-        } else {
-            System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
-        }
-    }
-
-    public static void system_print(String message) { System.out.println(ANSI_YELLOW + message + ANSI_RESET); }
-
-    public static void system_error(String message) { System.out.println(ANSI_RED + message + ANSI_RESET); }
-
-    private boolean processCommand(String text) {
-        if (isConnection(text)) {
-            if (clientName.isBlank()) {
-                system_error("You must set your name before you can connect via: /name your_name");
-                return true;
-            }
-            String[] parts = text.trim().replaceAll(" +", " ").split(" ")[1].split(":");
-            connect(parts[0].trim(), Integer.parseInt(parts[1].trim()));
-            return true;
-        } else if (isQuit(text)) {
-            isRunning = false;
-            return true;
-        } else if (isName(text)) {
-            return true;
-        } else if (isHelp(text)) {
-            system_print(HELP);
-            return true;
-        } else if (isClear(text)) {
-            System.out.print(UNIX_CLEAR);
-            System.out.flush();
-            system_print("Console cleared");
-        }
-        return false;
-    }
-
-    private void sendConnect() throws IOException {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.CONNECT);
-        p.setClientName(clientName);
-        out.writeObject(p);
-    }
-
-    private void sendMessage(String message) throws IOException {
-        Payload p = new Payload();
-        p.setPayloadType(PayloadType.MESSAGE);
-        p.setMessage(message);
-        p.setClientName(clientName);
-        out.writeObject(p);
-    }
-
-    private void listenForKeyboard() {
-        inputThread = new Thread() {
-            @Override
-            public void run() {
-                system_print("Enter /help to see a list of commands");
-                try (Scanner si = new Scanner(System.in);) {
-                    String line = "";
-                    isRunning = true;
-                    while (isRunning) {
-                        try {
-                            line = si.nextLine();
-                            if (!processCommand(line)) {
-                                if (isConnected()) {
-                                    if (line != null && line.trim().length() > 0) {
-                                        sendMessage(line);
-                                    }
-                                } else {
-                                    system_error("Not connected to server");
-                                }
-                            }
-                        } catch (Exception e) {
-                            system_error("Connection dropped");
-                            break;
-                        }
-                    }
-                    system_error("Exited loop");
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    close();
+  private void listenForKeyboard() {
+    inputThread = new Thread() {
+      @Override
+      public void run() {
+        system_print("Enter /help to see a list of commands");
+        try (Scanner si = new Scanner(System.in);) {
+          String line = "";
+          isRunning = true;
+          while (isRunning) {
+            try {
+              line = si.nextLine();
+              if (!processCommand(line)) {
+                if (isConnected()) {
+                  if (line != null && line.trim().length() > 0) {
+                    sendMessage(line);
+                  }
+                } else {
+                  system_error("Not connected to server");
                 }
+              }
+            } catch (Exception e) {
+              system_error("Connection dropped");
+              break;
             }
-        };
-        inputThread.start();
-    }
-
-    private void listenForServerMessage() {
-        fromServerThread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    Payload fromServer;
-
-                    while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processMessage(fromServer);
-                    system_error("Loop exited");
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    if (!server.isClosed()) {
-                        system_error("Server closed connection");
-                    } else {
-                        system_error("Connection closed");
-                    }
-                } finally {
-                    close();
-                    system_print("Stopped listening to server input");
-                }
-            }
-        };
-        fromServerThread.start();
-    }
-
-    private void processMessage(Payload p) {
-        switch (p.getPayloadType()) {
-            case CONNECT:
-            case DISCONNECT:
-                system_print(String.format("*%s %s*",
-                        p.getClientName(),
-                        p.getMessage()));
-                break;
-            case MESSAGE:
-                server_print(String.format("%s: %s",
-                        p.getClientName(),
-                        p.getMessage()));
-                break;
-            default:
-                break;
-
-        }
-    }
-
-    public void start() throws IOException {
-        listenForKeyboard();
-    }
-
-    private void close() {
-        try {
-            inputThread.interrupt();
+          }
+          system_error("Exited loop");
         } catch (Exception e) {
-            system_error("Error interrupting input");
-            e.printStackTrace();
+          e.printStackTrace();
+        } finally {
+          close();
         }
-        try {
-            fromServerThread.interrupt();
-        } catch (Exception e) {
-            system_error("Error interrupting listener");
-            e.printStackTrace();
-        }
-        try {
-            system_print("Closing output stream");
-            out.close();
-        } catch (NullPointerException ne) {
-            system_print("Server was never opened so this exception is ok");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            system_print("Closing input stream");
-            in.close();
-        } catch (NullPointerException ne) {
-            system_print("Server was never opened so this exception is ok");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            system_print("Closing connection");
-            server.close();
-            system_print("Closed socket");
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (NullPointerException ne) {
-            system_print("Server was never opened so this exception is ok");
-        }
-    }
+      }
+    };
+    inputThread.start();
+  }
 
-    public static void main(String[] args) {
-        Client client = new Client();
+  private void listenForServerMessage() {
+    fromServerThread = new Thread() {
+      @Override
+      public void run() {
         try {
-            client.start();
-        } catch (IOException e) {
-            e.printStackTrace();
+          Payload fromServer;
+
+          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null)
+            processMessage(fromServer);
+          system_error("Loop exited");
+        } catch (Exception e) {
+          e.printStackTrace();
+          if (!server.isClosed()) {
+            system_error("Server closed connection");
+          } else {
+            system_error("Connection closed");
+          }
+        } finally {
+          close();
+          system_print("Stopped listening to server input");
         }
+      }
+    };
+    fromServerThread.start();
+  }
+
+  private void processMessage(Payload p) {
+    switch (p.getPayloadType()) {
+      case CONNECT:
+      case DISCONNECT:
+        system_print(String.format("*%s %s*",
+            p.getClientName(),
+            p.getMessage()));
+        break;
+      case MESSAGE:
+        server_print(String.format("%s: %s",
+            p.getClientName(),
+            p.getMessage()));
+        break;
+      default:
+        break;
+
     }
+  }
+
+  public void start() throws IOException { listenForKeyboard(); }
+
+  private void close() {
+    try {
+      inputThread.interrupt();
+    } catch (Exception e) {
+      system_error("Error interrupting input");
+      e.printStackTrace();
+    }
+    try {
+      fromServerThread.interrupt();
+    } catch (Exception e) {
+      system_error("Error interrupting listener");
+      e.printStackTrace();
+    }
+    try {
+      system_print("Closing output stream");
+      out.close();
+    } catch (NullPointerException ne) {
+      system_print("Server was never opened so this exception is ok");
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    try {
+      system_print("Closing input stream");
+      in.close();
+    } catch (NullPointerException ne) {
+      system_print("Server was never opened so this exception is ok");
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    try {
+      system_print("Closing connection");
+      server.close();
+      system_print("Closed socket");
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (NullPointerException ne) {
+      system_print("Server was never opened so this exception is ok");
+    }
+  }
+
+  public static void main(String[] args) {
+    Client client = new Client();
+    try {
+      client.start();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
 
 }

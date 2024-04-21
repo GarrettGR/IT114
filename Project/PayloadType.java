@@ -1,3 +1,3 @@
 public enum PayloadType {
-    CONNECT, DISCONNECT, MESSAGE
+  CONNECT, DISCONNECT, MESSAGE, PING
 }
