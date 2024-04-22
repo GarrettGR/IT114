@@ -102,7 +102,7 @@ public class Client {
     } else if (isQuit(text)) {
       isRunning = false;
       return true;
-    } else if (isName(text)) {
+    } else if (isName(text) && !isConnected()) {
       return true;
     } else if (isHelp(text)) {
       system_print(HELP);

@@ -84,7 +84,7 @@ public class Server {
             disconnect(client);
             return true;
         } else if (message.equalsIgnoreCase("/users")) {
-            String list = "Server: ";
+            String [list] = "Server: ";
             for (ServerThread clnt : clients) {
                 list += clnt.getUserName() + ", ";
             }

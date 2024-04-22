@@ -79,7 +79,7 @@ public class Server {
   }
 
   protected String generateUniqueName() {
-    String baseName = "Client";
+    String baseName = "User";
     int counter = 0;
     String potentialName;
     do {

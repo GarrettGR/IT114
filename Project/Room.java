@@ -13,6 +13,9 @@ public class Room implements AutoCloseable {
   private final static String DISCONNECT = "disconnect";
   private final static String LOGOUT = "logout";
   private final static String LOGOFF = "logoff";
+  private final static String USERS = "users";
+  private final static String RENAME = "rename";
+  private final static String PM = "pm";
 
   public Room(String name) {
     this.name = name;
@@ -66,8 +69,8 @@ public class Room implements AutoCloseable {
       if (message.startsWith(COMMAND_TRIGGER)) {
         String[] comm = message.split(COMMAND_TRIGGER);
         String part1 = comm[1];
-        String[] comm2 = part1.split(" ");
-        String command = comm2[0];
+        String[] comm2 = part1.split(" +");
+        String command = comm2[0].toLowerCase();
         String roomName;
         wasCommand = true;
         switch (command) {
@@ -78,6 +81,64 @@ public class Room implements AutoCloseable {
           case JOIN_ROOM:
             roomName = comm2[1];
             Room.joinRoom(roomName, client);
+            break;
+          case USERS:
+            StringBuilder list = new StringBuilder();
+            list.append(clients.size() + " Users in room (" + this.name + "): \n");
+            for (ServerThread c : clients) {
+              list.append(c.getClientName());
+              if (clients.indexOf(c) < clients.size() - 1) list.append("\n");
+            }
+            client.sendMessage("Server",list.toString());
+            break;
+          case RENAME:
+            String newName = comm2[1];
+            if (!isTakenName(newName)) {
+              client.setClientName(newName);
+            } else {
+              client.sendMessage("Server", "Name already taken");
+            }
+            break;
+          case PM:           
+            List<ServerThread> targets = new ArrayList<ServerThread>();
+            List<String> targetNames = new ArrayList<String>();
+            StringBuilder privMsg = new StringBuilder();
+            for (String messagePart : comm2) {
+              if (messagePart.startsWith("@")) {
+                messagePart = messagePart.substring(1);
+                for (ServerThread c : clients) {
+                  if (c.getClientName().equals(messagePart)) {
+                    targets.add(c); 
+                    targetNames.add(messagePart);
+                  }
+                }
+              } else {
+                if (!messagePart.equalsIgnoreCase(PM)) {
+                  if (privMsg.length() > 0) privMsg.append(" ");
+                  privMsg.append(messagePart);
+                }
+              }
+            }
+            if (privMsg.length() <= 0) {
+              client.sendMessage("Server", "No message found");
+              break;
+            } else if (targets.isEmpty()) {
+              client.sendMessage("Server", "No valid targets found");
+              break;
+            }
+            if (targets.size() == 0) {
+              client.sendMessage("Server", "No valid targets found");
+            } else {
+              for (ServerThread target : targets) {
+                StringBuilder finalMsg = new StringBuilder();
+                finalMsg.append("Private message with: ");
+                finalMsg.append(client.getClientName());
+                for (String targetName : targetNames) if (!targetName.equals(target.getClientName())) finalMsg.append(", " + targetName);
+                finalMsg.append("\n" + client.getClientName() + ": " + privMsg.toString());
+                target.sendMessage("Server", finalMsg.toString());
+              }
+              client.sendMessage("Server", "Message sent to " + targets.size() + String.format(" user(s): %s", targetNames));
+            }
             break;
           case DISCONNECT:
           case LOGOUT:
