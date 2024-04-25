@@ -1,5 +1,5 @@
 Package Project.common;
 
 public enum PayloadType {
-  CONNECT, DISCONNECT, MESSAGE, PING, GAME_START, 
+  CONNECT, DISCONNECT, MESSAGE, PING, GAME_START, GAME_STATE, GAME_END
 }
