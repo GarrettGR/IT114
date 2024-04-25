@@ -1,3 +1,5 @@
+Package Project.client;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -220,25 +222,41 @@ public class Client {
     }
   }
 
-  private void drawBoard() {
+  private void drawBoard(PieceType[][] board) {
     final char EMPTY_SPACE = ' ';
-    for (int i = 0; i < 10; i++) {
+
+    for (PieceType[] row : board) {
       System.out.print(' ');
-      for (int j = 0; j < 10; j++) {
-        game_print("[" + EMPTY_SPACE + "]");
+      for (PieceType piece : row) {
+        game_print("[");
+        switch (piece) {
+          case EMPTY:
+            System.out.print(EMPTY_SPACE + "");
+            break;
+          case SHIP:
+            System.out.print(SQUARE);
+            break;
+          case HIT:
+            System.out.print(ANSI_RED + SQUARE + ANSI_RESET);
+            break;
+          case MISS:
+            game_print("X");
+            break;
+          default:
+            break;
+        }
+        game_print("]");
       }
       System.out.println();
     }
   }
 
-  private void drawGame(){
-    drawBoard();
+  private void drawGame(PieceType[][] OpponentBoard, PieceType[][] PlayerBoard) {
+    drawBoard(OpponentBoard);
     System.out.print(' ');
-    for (int i = 0; i < 30; i++) {
-      game_print("-");
-    }
+    for (int i = 0; i < 30; i++) game_print("-");
     System.out.println();
-    drawBoard();
+    drawBoard(PlayerBoard);
   }
 
   public void start() throws IOException { listenForKeyboard(); }

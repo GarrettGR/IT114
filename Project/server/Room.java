@@ -1,3 +1,5 @@
+Package Project.server;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -18,6 +20,7 @@ public class Room implements AutoCloseable {
   private final static String PM = "pm";
   // temporary:
   private final static String GAME_START = "play";
+  // TODO: Make it so that you pass it a target user, and only a user who accepted the game is put into it
 
   public Room(String name) {
     this.name = name;
