@@ -16,6 +16,8 @@ public class Room implements AutoCloseable {
   private final static String USERS = "users";
   private final static String RENAME = "rename";
   private final static String PM = "pm";
+  // temporary:
+  private final static String GAME_START = "play";
 
   public Room(String name) {
     this.name = name;
@@ -138,6 +140,12 @@ public class Room implements AutoCloseable {
                 target.sendMessage("Server", finalMsg.toString());
               }
               client.sendMessage("Server", "Message sent to " + targets.size() + String.format(" user(s): %s", targetNames));
+            }
+            break;
+          case GAME_START:
+            for (ServerThread c : clients) {
+              c.sendMessage("Server", "Game starting soon!");
+              c.sendGameEvent(PayloadType.GAME_START);
             }
             break;
           case DISCONNECT:

@@ -81,6 +81,15 @@ public class ServerThread extends Thread {
     return send(p);
   }
 
+  public boolean sendGameEvent(PayloadType type, Object... data) {
+    Payload p = new Payload();
+    p.setPayloadType(type);
+    for (Object datum : data) {
+      System.out.println("Adding data: " + datum);
+    }
+    return send(p);
+  }
+
   private boolean send(Payload payload) {
     try {
       out.writeObject(payload);

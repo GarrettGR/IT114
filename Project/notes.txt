@@ -1,0 +1,16 @@
+Ships:
+    1x Carrier (5)
+    1x Battleship (4)
+    2x Destroyer (3)
+    2x Submarine (3)
+    2x Patrol Boat (2)
+
+Board:
+    4 10x10 grids (two for each player)
+
+Variations:
+    Regular (easy) - the game everyone is used to
+    Regular (hard) - doesn't tell you when a ship has been sunk
+    Salvo (easy) - result of each shot shown
+    Salvo (hard) - result of salvo in its entirety
+

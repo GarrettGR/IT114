@@ -15,7 +15,9 @@ public class Client {
   public static final String ANSI_YELLOW = "\u001B[33m";
   public static final String ANSI_RED = "\u001B[31m";
   public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
+  public static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
   public static final String UNIX_CLEAR = "\033[H\033[2J";
+  public static final String SQUARE = "\u25A0";
 
   public static final String HELP = """
       /connect [ip address]:[port] - Connect to a server
@@ -91,6 +93,8 @@ public class Client {
   public static void system_print(String message) { System.out.println(ANSI_YELLOW + message + ANSI_RESET); }
 
   public static void system_error(String message) { System.out.println(ANSI_RED + message + ANSI_RESET); }
+
+  public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
 
   private boolean processCommand(String text) {
     if (isConnection(text)) {
@@ -206,10 +210,35 @@ public class Client {
             p.getClientName(),
             p.getMessage()));
         break;
+      case GAME_START:
+        system_print("Game starting");
+        drawGame();
+        break;
+      case PING:
       default:
         break;
-
     }
+  }
+
+  private void drawBoard() {
+    final char EMPTY_SPACE = ' ';
+    for (int i = 0; i < 10; i++) {
+      System.out.print(' ');
+      for (int j = 0; j < 10; j++) {
+        game_print("[" + EMPTY_SPACE + "]");
+      }
+      System.out.println();
+    }
+  }
+
+  private void drawGame(){
+    drawBoard();
+    System.out.print(' ');
+    for (int i = 0; i < 30; i++) {
+      game_print("-");
+    }
+    System.out.println();
+    drawBoard();
   }
 
   public void start() throws IOException { listenForKeyboard(); }
