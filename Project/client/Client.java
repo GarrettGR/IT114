@@ -7,6 +7,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Scanner;
 
+import Project.common.*;
+
 public class Client {
 
   Socket server = null;
@@ -214,7 +216,7 @@ public class Client {
         break;
       case GAME_START:
         system_print("Game starting");
-        drawGame();
+        drawGame(p.getPlayerBoard(), p.getOpponentBoard());
         break;
       case PING:
       default:

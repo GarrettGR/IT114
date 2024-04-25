@@ -5,6 +5,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
+import Project.common.*;
+
 public class ServerThread extends Thread {
   private Socket client;
   private String clientName;

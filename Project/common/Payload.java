@@ -8,7 +8,8 @@ public class Payload implements Serializable {
   private String clientName;
   private String message;
   private int number;
-  private PieceType[][] board;
+  private PieceType[][] opponentBoard;
+  private PieceType[][] playerBoard;
 
   public PayloadType getPayloadType() { return payloadType; }
 
@@ -26,9 +27,13 @@ public class Payload implements Serializable {
 
   public void setNumber(int number) { this.number = number; }
 
-  public void setBoard(PieceType[][] board) { this.board = board; }
+  public void setPlayerBoard(PieceType[][] board) { this.playerBoard = board; }
 
-  public PieceType[][] getBoard() { return board; }
+  public PieceType[][] getPlayerBoard() { return playerBoard; }
+
+  public void setOpponentBoard(PieceType[][] board) { this.opponentBoard = board; }
+
+  public PieceType[][] getOpponentBoard() { return opponentBoard; }
 
   @Override
   public String toString() {
