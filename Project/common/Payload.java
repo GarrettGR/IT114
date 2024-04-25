@@ -1,4 +1,4 @@
-Package Project.common;
+package Project.common;
 
 import java.io.Serializable;
 
@@ -8,6 +8,7 @@ public class Payload implements Serializable {
   private String clientName;
   private String message;
   private int number;
+  private PieceType[][] board;
 
   public PayloadType getPayloadType() { return payloadType; }
 
@@ -24,6 +25,10 @@ public class Payload implements Serializable {
   public int getNumber() { return number; }
 
   public void setNumber(int number) { this.number = number; }
+
+  public void setBoard(PieceType[][] board) { this.board = board; }
+
+  public PieceType[][] getBoard() { return board; }
 
   @Override
   public String toString() {
