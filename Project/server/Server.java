@@ -25,7 +25,7 @@ public class Server {
         if (incoming_client != null) {
           System.out.println("Client connected");
           ServerThread sClient = new ServerThread(incoming_client, lobby);
-          sClient.start();
+          sClient.startVirtualThread();
           joinRoom("lobby", sClient);
           incoming_client = null;
         }
