@@ -9,8 +9,24 @@ Board:
     4 10x10 grids (two for each player)
 
 Variations:
-    Regular (easy) - the game everyone is used to
-    Regular (hard) - doesn't tell you when a ship has been sunk
+    classic (easy) - the game everyone is used to
+    classic (hard) - doesn't tell you when a ship has been sunk
     Salvo (easy) - result of each shot shown
     Salvo (hard) - result of salvo in its entirety
 
+Data:
+    GAME_START (server -> client):
+        - If the target user accepts, draw the boards
+    GAME_PLACE (server <- & -> client):
+        - Lets the server tell the user to place their ships (and draws their board)
+        - Lets the user return where to place their ships on the starting baord (only can move ships before the first round)
+    GAME_STATE (server -> client):
+        - Opponent Board
+        - Player Board
+        - Game message (whether there was a hit, miss, etc.)
+    GAME_TURN (client -> server):
+        - Lets the user taget a location to fire a shot (or multiple for salvo)
+    GAME_END (server -> client):
+        - Who won (message)
+        - Remove users from game & remove spectaters
+        - Kill game thread

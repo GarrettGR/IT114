@@ -45,6 +45,13 @@ public class Server {
     return null;
   }
 
+  protected String[] listRoomNames() {
+    String[] roomNames = new String[rooms.size()];
+    for (int i = 0, l = rooms.size(); i < l; i++)
+      roomNames[i] = rooms.get(i).getName();
+    return roomNames;
+  }
+
   protected synchronized boolean joinRoom(String roomName, ServerThread client) {
     Room newRoom = roomName.equalsIgnoreCase("lobby") ? lobby : getRoom(roomName);
     Room oldRoom = client.getCurrentRoom();
@@ -65,7 +72,6 @@ public class Server {
 
   protected synchronized boolean createNewRoom(String roomName) {
     if (getRoom(roomName) != null) {
-      // TODO can't create room
       System.out.println(String.format("Room %s already exists", roomName));
       return false;
     } else {

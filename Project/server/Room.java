@@ -10,8 +10,11 @@ public class Room implements AutoCloseable {
   protected static Server server;
   private String name;
   private List<ServerThread> clients = new ArrayList<ServerThread>();
+  private List<BattleshipThread> games = new ArrayList<BattleshipThread>();
   private boolean isRunning = false;
+
   private final static String COMMAND_TRIGGER = "/";
+  private final static String LIST_ROOMS = "rooms";
   private final static String CREATE_ROOM = "createroom";
   private final static String JOIN_ROOM = "joinroom";
   private final static String DISCONNECT = "disconnect";
@@ -20,9 +23,8 @@ public class Room implements AutoCloseable {
   private final static String USERS = "users";
   private final static String RENAME = "rename";
   private final static String PM = "pm";
-  // temporary:
   private final static String GAME_START = "play";
-  // TODO: Make it so that you pass it a target user, and only a user who accepted the game is put into it
+  private final static String GAME_LIST = "games";
 
   public Room(String name) {
     this.name = name;
@@ -89,6 +91,15 @@ public class Room implements AutoCloseable {
             roomName = comm2[1];
             Room.joinRoom(roomName, client);
             break;
+          case LIST_ROOMS:
+            StringBuilder rooms = new StringBuilder();
+            rooms.append("Rooms: \n");
+            for (String room : server.listRoomNames()) {
+              rooms.append(room);
+              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n");
+            }
+            client.sendMessage("Server", rooms.toString());
+            break;
           case USERS:
             StringBuilder list = new StringBuilder();
             list.append(clients.size() + " Users in room (" + this.name + "): \n");
@@ -147,11 +158,35 @@ public class Room implements AutoCloseable {
               client.sendMessage("Server", "Message sent to " + targets.size() + String.format(" user(s): %s", targetNames));
             }
             break;
-          case GAME_START:
-            for (ServerThread c : clients) {
-              c.sendMessage("Server", "Game starting soon!");
-              c.sendGameEvent(PayloadType.GAME_START);
+          case GAME_LIST:
+            StringBuilder gameList = new StringBuilder();
+            gameList.append("Games: \n");
+            for (BattleshipThread game : games) {
+              gameList.append(game.getName());
+              if (games.indexOf(game) < games.size() - 1) gameList.append("\n");
             }
+            client.sendMessage("Server", gameList.toString());
+            break;
+          case GAME_START:
+            boolean hardDifficulty = false;
+            boolean salvoGameMode = false;
+            List<String> targetUsers = new ArrayList<String>();
+            for (String messagePart : comm2) {
+              if (messagePart.startsWith("@")) {
+                targetUsers.add(messagePart.substring(1));
+              } else if (messagePart.equalsIgnoreCase("hard")) {
+                hardDifficulty = true;
+              } else if (messagePart.equalsIgnoreCase("salvo")) {
+                salvoGameMode = true;
+              }
+            }
+            BattleshipThread newGame = new BattleshipThread(hardDifficulty, salvoGameMode);
+            newGame.addPlayer(client);
+            for (String targetUser : targetUsers)
+              for (ServerThread c : clients)
+                if (c.getClientName().equals(targetUser))
+                  newGame.addPlayer(c); //TODO: Add check for if player is already in a game / wants to play
+            games.add(newGame);
             break;
           case DISCONNECT:
           case LOGOUT:
@@ -198,6 +233,19 @@ public class Room implements AutoCloseable {
       if (client == sender) continue;
       boolean messageSent = client.sendMessage(from, message);
       if (!messageSent) handleDisconnect(iter, client);
+    }
+  }
+
+  protected synchronized void sendGameEvent(ServerThread player, Payload payload){
+    if (!isRunning) return;
+    info("Sending game event to " + clients.size() + " clients");
+    Iterator<BattleshipThread> iter = games.iterator();
+    while (iter.hasNext()) {
+      BattleshipThread game = iter.next();
+      if (game == null) continue;
+      if (game.hasPlayer(player)) {
+        game.pushPayload(player, payload);
+      }
     }
   }
 

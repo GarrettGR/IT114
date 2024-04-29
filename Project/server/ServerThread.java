@@ -65,6 +65,20 @@ public class ServerThread extends Thread {
     return send(p);
   }
 
+  public void sendGameEvent(Payload p) {
+    switch(p.getPayloadType()) {
+      case GAME_START:
+      case GAME_STATE:
+        send(p);
+        break;
+      case GAME_MESSAGE:
+      case GAME_END:
+        sendMessage("Game", p.getMessage());
+      default:
+        break;
+    }
+  }
+
   public boolean sendPing() {
     Payload p = new Payload();
     p.setPayloadType(PayloadType.PING);
@@ -82,15 +96,6 @@ public class ServerThread extends Thread {
     p.setPayloadType(isConnected ? PayloadType.CONNECT : PayloadType.DISCONNECT);
     p.setClientName(who);
     p.setMessage(isConnected ? "connected" : "disconnected");
-    return send(p);
-  }
-
-  public boolean sendGameEvent(PayloadType type, Object... data) {
-    Payload p = new Payload();
-    p.setPayloadType(type);
-    for (Object datum : data) {
-      System.out.println("Adding data: " + datum);
-    }
     return send(p);
   }
 
@@ -137,6 +142,10 @@ public class ServerThread extends Thread {
         setClientName(p.getClientName());
         break;
       case DISCONNECT:// TBD
+        break;
+      case GAME_PLACE:
+      case GAME_TURN:
+        if (currentRoom != null) currentRoom.sendGameEvent(this, p);
         break;
       case MESSAGE:
         if (currentRoom != null) {

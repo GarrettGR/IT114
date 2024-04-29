@@ -27,9 +27,20 @@ public class Client {
       /connect [ip address]:[port] - Connect to a server
       /connect localhost:[port] - Connect to a server on localhost
       /disconnect - Disconnect from the server
-      /name [username] - Set or change username
+      
+      /rename [username] - Set or change username
       /users - List users in the chat
+      
       /pm @[username] ... @[username] [message] - Send a private message
+      /createroom [room name] - Create a private room
+      /joinroom [room name] - Join a private room
+      /leaveroom - Leave a private room (to Lobby)
+      /rooms - List all available rooms
+      
+      /play - Start a game (open to everyone)
+      /play @[username] - Start a game with a user
+      /games - List all currently active games
+      
       /clear - Clear the console
       /quit - Exit the program
       /help - Show this help message
@@ -139,6 +150,8 @@ public class Client {
     out.writeObject(p);
   }
 
+  private void sendPayload(Payload p) throws IOException { out.writeObject(p); }
+
   private void listenForKeyboard() {
     inputThread = new Thread() {
       @Override
@@ -216,7 +229,12 @@ public class Client {
         break;
       case GAME_START:
         system_print("Game starting");
-        drawGame(p.getPlayerBoard(), p.getOpponentBoard());
+      case GAME_STATE:
+        drawGame(p.getPlayerBoard(), p.getOpponentBoards());
+        break;
+      case GAME_PLACE:
+        system_print(p.getMessage());
+        drawBoard(p.getPlayerBoard());
         break;
       case PING:
       default:
@@ -253,12 +271,16 @@ public class Client {
     }
   }
 
-  private void drawGame(PieceType[][] OpponentBoard, PieceType[][] PlayerBoard) {
-    drawBoard(OpponentBoard);
-    System.out.print(' ');
-    for (int i = 0; i < 30; i++) game_print("-");
-    System.out.println();
-    drawBoard(PlayerBoard);
+  private void drawGame(PieceType[][] playerBoard, Object[] oponnentBoards) {
+    for (Object obj : oponnentBoards) {
+      PieceType[][] board = (PieceType[][]) obj;
+      drawBoard(board);
+      System.out.print(' ');
+      for (int i = 0; i < 30; i++) game_print("-");
+      System.out.println();
+    }
+    System.out.println("\nYour board:");
+    drawBoard(playerBoard);
   }
 
   public void start() throws IOException { listenForKeyboard(); }

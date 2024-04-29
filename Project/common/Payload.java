@@ -1,6 +1,7 @@
 package Project.common;
 
 import java.io.Serializable;
+import java.util.Map;
 
 public class Payload implements Serializable {
   private static final long serialVersionUID = 1L;
@@ -8,8 +9,9 @@ public class Payload implements Serializable {
   private String clientName;
   private String message;
   private int number;
-  private PieceType[][] opponentBoard;
   private PieceType[][] playerBoard;
+  private Map<String, PieceType[][]> opponentBoards = Map.of();
+  private int[][] position;
 
   public PayloadType getPayloadType() { return payloadType; }
 
@@ -31,9 +33,17 @@ public class Payload implements Serializable {
 
   public PieceType[][] getPlayerBoard() { return playerBoard; }
 
-  public void setOpponentBoard(PieceType[][] board) { this.opponentBoard = board; }
+  public void addOpponentBoard(String playerName, PieceType[][] board) { this.opponentBoards.put(playerName, board); }
 
-  public PieceType[][] getOpponentBoard() { return opponentBoard; }
+  public void setOpponentBoard(String playerName, PieceType[][] board) { this.opponentBoards.replace(playerName, board); }
+
+  public PieceType[][] getOpponentBoard(String playerName) { return opponentBoards.get(playerName); }
+
+  public Object[] getOpponentBoards() { return opponentBoards.values().toArray(); }
+
+  public void setPosition(int[][] position) { this.position = position; }
+
+  public int[][] getPosition() { return position; }
 
   @Override
   public String toString() {
