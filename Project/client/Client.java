@@ -1,13 +1,16 @@
 package Project.client;
 
+import Project.common.*;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
-
-import Project.common.*;
 
 public class Client {
 
@@ -23,7 +26,7 @@ public class Client {
   public static final String UNIX_CLEAR = "\033[H\033[2J";
   public static final String SQUARE = "\u25A0";
 
-  public static final String HELP = """
+  private static final String HELP = """
       /connect [ip address]:[port] - Connect to a server
       /connect localhost:[port] - Connect to a server on localhost
       /disconnect - Disconnect from the server
@@ -45,13 +48,27 @@ public class Client {
       /quit - Exit the program
       /help - Show this help message
       """;
+  private static final String GAME_HELP = """
+      /attack [player] [row] [column] - Attack a position on the board of that player
+      /place [ship] [row] [column] [direction] - Place a ship on your board
+      note: with one end at the location provided, direction = 'up', 'down', 'left', 'right'
+
+      /spectate - Stop playing and watch the game instead
+      /clear - Clear the console
+      /quit - Exit the program
+      /help - Show this help message
+      """;
 
   final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
   final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
   boolean isRunning = false;
+  private boolean inGame = false;
   private Thread inputThread;
   private Thread fromServerThread;
   private String clientName = "";
+  private Map<String, Integer[]> ships = new HashMap<>();
+  private List<int[]> position = new ArrayList<>();
+  private List<String> directions = new ArrayList<>();
 
   public Client() { system_print("Client Created"); }
 
@@ -97,6 +114,13 @@ public class Client {
 
   private boolean isClear(String text) { return text.equalsIgnoreCase("/clear"); }
 
+  private boolean isGameEvent(String text) { 
+      return switch (text.toLowerCase().split(" ")[0]) {
+          case "/place", "/attack", "/spectate" -> true;
+          default -> false;
+      };
+  }
+
   public static void server_print(String message) {
     if (message.startsWith("Server:")) {
       System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
@@ -113,8 +137,7 @@ public class Client {
 
   private boolean processCommand(String text) {
     if (isConnection(text)) {
-      if (clientName.isBlank())
-        system_print("You can set your name by using: /name your_name");
+      if (clientName.isBlank()) system_print("You can set your name by using: /name your_name");
       String[] parts = text.trim().replaceAll(" +", " ").split(" ")[1].split(":");
       connect(parts[0].trim(), Integer.parseInt(parts[1].trim()));
       return true;
@@ -124,12 +147,26 @@ public class Client {
     } else if (isName(text) && !isConnected()) {
       return true;
     } else if (isHelp(text)) {
-      system_print(HELP);
+      if (inGame) system_print(GAME_HELP);
+      else system_print(HELP);
       return true;
     } else if (isClear(text)) {
       System.out.print(UNIX_CLEAR);
       System.out.flush();
       system_print("Console cleared");
+      return true;
+    } else if (isGameEvent(text)) {
+      String[] parts = text.trim().replaceAll(" +", " ").split(" ");
+      if (parts[0].equalsIgnoreCase("/place")) {
+        while(!ships.isEmpty()) placeShips(parts);
+        sendGameEvent(PayloadType.GAME_PLACE);
+      } else if (parts[0].equalsIgnoreCase("/attack")) {
+        sendGameEvent(PayloadType.GAME_TURN, parts[1], parts[2], parts[3]);
+      } else if (parts[0].equalsIgnoreCase("/spectate")) {
+
+      } else {
+        system_error("Invalid game event");
+      }
       return true;
     }
     return false;
@@ -150,7 +187,57 @@ public class Client {
     out.writeObject(p);
   }
 
-  private void sendPayload(Payload p) throws IOException { out.writeObject(p); }
+  private void placeShips(String[] parts){
+    system_print("Place your ships");
+    system_print("Available ships: ");
+    for (Map.Entry<String, Integer[]> ship : ships.entrySet()) {
+      system_print(ship.getValue()[1] + "x " + ship.getKey() + ": " + ship.getValue()[0]);
+    }
+    system_print("Place ships by typing: /place [ship] [row] [column] [direction]");
+    system_print("Example: /place Carrier 1 1 right");
+
+    if (parts.length != 4) {
+      system_error("Invalid ship placement");
+    }
+    if (ships.containsKey(parts[1])) {
+      position.add(new int[]{Integer.parseInt(parts[2]), Integer.parseInt(parts[3])});
+      directions.add(parts[4]);
+      removeShip(parts[1]);
+    } else {
+      system_error("You don't have that ship left to place");
+    }
+
+  }
+
+  private void removeShip(String ship) {
+    ships.get(ship)[1]--;
+    if (ships.get(ship)[1] == 0) ships.remove(ship);
+  }
+
+  private void sendGameEvent(PayloadType type, Object ... data){
+    Payload p = new Payload();
+    p.setPayloadType(type);
+    p.setClientName(clientName);
+    if (type == PayloadType.GAME_PLACE) { //place [ship] [row] [column] [direction]
+      p.setPosition(String.valueOf(clientName), position.toArray(new int[position.size()][]));
+      p.setOtherData(directions.toArray());
+    } else if (type == PayloadType.GAME_TURN) { //handle multiple attacks (one for each player) & salvo gameMode
+      int[][] position = {{Integer.parseInt((String) data[1]), Integer.parseInt((String) data[2])}};
+      p.setPosition(String.valueOf(data[0]), position);
+    } else {
+      system_error("Invalid game event");
+      return;
+    }
+    sendPayload(p);
+  }
+
+  private void sendPayload(Payload p) { 
+    try {
+      out.writeObject(p);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+   }
 
   private void listenForKeyboard() {
     inputThread = new Thread() {
@@ -165,9 +252,7 @@ public class Client {
               line = si.nextLine();
               if (!processCommand(line)) {
                 if (isConnected()) {
-                  if (line != null && line.trim().length() > 0) {
-                    sendMessage(line);
-                  }
+                  if (line != null && line.trim().length() > 0) sendMessage(line);
                 } else {
                   system_error("Not connected to server");
                 }
@@ -196,7 +281,7 @@ public class Client {
           Payload fromServer;
 
           while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null)
-            processMessage(fromServer);
+          processMessage(fromServer);
           system_error("Loop exited");
         } catch (Exception e) {
           e.printStackTrace();
@@ -229,10 +314,18 @@ public class Client {
         break;
       case GAME_START:
         system_print("Game starting");
+        inGame = true;
+        break;
       case GAME_STATE:
         drawGame(p.getPlayerBoard(), p.getOpponentBoards());
         break;
       case GAME_PLACE:
+        Object[] data = p.getOtherData();
+        for (int i = 0; i < data.length; i += 2) {
+          String key = (String) data[i];
+          Integer[] value = (Integer[]) data[i + 1];
+          ships.put(key, value);
+        }
         system_print(p.getMessage());
         drawBoard(p.getPlayerBoard());
         break;

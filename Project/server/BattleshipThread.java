@@ -5,11 +5,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.concurrent.Callable;
 
 import Project.common.*;
 
 public class BattleshipThread extends Thread {
+  private Room room;
   private static final int BOARD_SIZE = 10;
   private boolean hardDifficulty;
   private boolean salvoGameMode;
@@ -23,15 +25,22 @@ public class BattleshipThread extends Thread {
         EMPTY_BOARD[i][j] = PieceType.EMPTY;
   }
 
-  private Map<ServerThread, PieceType[][]> players = Map.of();
+  private Map<ServerThread, PieceType[][]> players = new HashMap<>();
   private List<ServerThread> spectators = new ArrayList<>();
 
-  private Map<String, Integer> ShipLengths = Map.of("Carrier", 5, "Battleship", 4, "Cruiser", 3, "Submarine", 3, "Destroyer", 2);
-  private Map<String, Integer> ShipCounts = Map.of("Carrier", 1, "Battleship", 1, "Cruiser", 2, "Submarine", 2, "Destroyer", 2);
+  private Map<String, Integer[]> ShipData = Map.of(
+    "Carrier",    new Integer[] { 5, 1 },
+    "Battleship", new Integer[] { 4, 1 },
+    "Cruiser",    new Integer[] { 3, 2 },
+    "Submarine",  new Integer[] { 3, 2 },
+    "Destroyer",  new Integer[] { 2, 2 }
+  );
 
-  public BattleshipThread(boolean hardDifficulty, boolean salvoGameMode) {
+  public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode) {
     this.hardDifficulty = hardDifficulty;
     this.salvoGameMode = salvoGameMode;
+    this.room = room;
+    System.out.println("Battleship game thread created");
   }
 
   private void initBoards() {
@@ -90,6 +99,7 @@ public class BattleshipThread extends Thread {
   @Override
   public void run() {
     isRunning = true;
+    System.out.println("Battleship game thread started");
     if (!hardDifficulty) hardDifficulty = false;
     if (!salvoGameMode) salvoGameMode = false;
 
@@ -97,21 +107,36 @@ public class BattleshipThread extends Thread {
 
     // TODO: give all players a chance to place their ships (90 seconds or when all players have placed)
 
-    Callable<Boolean> playerPlaceShip = () -> {
-      Payload p = new Payload();
-      StringBuilder message = new StringBuilder("Place your ships: ");
-      for (String ship : ShipCounts.keySet())
-        message.append(String.format("%s(%d), ", ship, ShipCounts.get(ship)));
-      p.setPayloadType(PayloadType.GAME_PLACE);
-      p.setMessage(message.toString());
-      p.setPlayerBoard(EMPTY_BOARD);
-      return false;
-    };
-
     for (ServerThread player : players.keySet()) {
+      Callable<Boolean> playerPlaceShip = () -> {
+        Payload p = new Payload();
+        p.setPayloadType(PayloadType.GAME_PLACE);
+        StringBuilder message = new StringBuilder("Place your ships: ");
+        message.append("ShipName : [Length, Quantity]");
+        for (String ship : ShipData.keySet())
+          message.append(String.format("%s : %d, ", ship, ShipData.get(ship))); // TODO: Format better (easier to read)
+        p.setMessage(message.toString());
+        p.setPlayerBoard(EMPTY_BOARD);
+        List<Object> data = new ArrayList<>();
+        for (Map.Entry<String, Integer[]> entry : ShipData.entrySet()) {
+            data.add(entry.getKey());
+            data.add(entry.getValue());
+        }
+        p.setOtherData(data.toArray());
+        player.sendGameEvent(p);
+        while (!hasPlacedShips(player)) {
+          try {
+            Thread.sleep(500);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+        }
+        return true;
+      };
       TimedEvent placeShip = new TimedEvent(playerPlaceShip, () -> {
-          addSpectator(player);
-          removePlayer(player);
+        // TODO: Query for a gamestate? (even if not all ships have been placed, those that have will be used)
+        addSpectator(player);
+        removePlayer(player);
       }, 90);
       placeShip.start();
     }
@@ -122,7 +147,6 @@ public class BattleshipThread extends Thread {
 
     while (isRunning) {
       if (players.size() == 0) isRunning = false;
-
       for (ServerThread player : playerOrder) {
         Callable<Boolean> playerTakeTurn = () -> {
           Payload p = new Payload();
@@ -131,14 +155,21 @@ public class BattleshipThread extends Thread {
           for (ServerThread opponent : players.keySet())
             if (opponent != player) p.addOpponentBoard(opponent.getClientName(), players.get(opponent));
           p.setMessage("Take your turn");
-          return false;
+          player.sendGameEvent(p);
+
+          // TODO: Wait for the player to take their turn, return true if they took their turn
+
+          return true;
         };
 
         TimedEvent takeTurn = new TimedEvent(playerTakeTurn, () -> {
-          // TODO: Tell the player they took too long to take their turn (skipped)
+          Payload p = new Payload();
+          p.setPayloadType(PayloadType.GAME_MESSAGE);
+          p.setMessage("You took too long to take your turn");
+          player.sendGameEvent(p);
         }, 90);
+        takeTurn.start();
       }
-
       for (ServerThread player : players.keySet()) {
         boolean noShips = hasPlacedShips(player);
         if (noShips) {
@@ -146,14 +177,21 @@ public class BattleshipThread extends Thread {
           removePlayer(player);
         }
       }
-
       if (players.size() == 1) {
-        for (ServerThread player : players.keySet()) {
-          // tell the winning player they won
-          // tell all the other players who won (and wish them better luck next time)
+        ServerThread winner = players.keySet().iterator().next();
+        for (ServerThread spectator : spectators) {
+          Payload p = new Payload();
+          p.setPayloadType(PayloadType.GAME_MESSAGE);
+          p.setMessage(winner.getClientName() + " has won the game!");
+          spectator.sendGameEvent(p);
         }
+        Payload p = new Payload();
+        p.setPayloadType(PayloadType.GAME_MESSAGE);
+        p.setMessage("You have won the game!");
+        winner.sendGameEvent(p);
+        System.out.println("Game over, " + winner.getClientName() + " has won the game!");
+        isRunning = false;
       }
-
     }
   }
 }

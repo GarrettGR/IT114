@@ -30,3 +30,7 @@ Data:
         - Who won (message)
         - Remove users from game & remove spectaters
         - Kill game thread
+
+TODO:
+- only sends a message when using /name -- when using /rename it doesnt, and only works if connected to a server
+- It creates the battleship thread, but then nothing happens

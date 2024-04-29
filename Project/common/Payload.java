@@ -1,6 +1,7 @@
 package Project.common;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Map;
 
 public class Payload implements Serializable {
@@ -10,8 +11,9 @@ public class Payload implements Serializable {
   private String message;
   private int number;
   private PieceType[][] playerBoard;
-  private Map<String, PieceType[][]> opponentBoards = Map.of();
-  private int[][] position;
+  private Map<String, PieceType[][]> opponentBoards = new HashMap<>();
+  private Map<String, int[][]> positionMap = new HashMap<>();
+  private Object[] otherData; // When placing ships, the 'otherData' will be the list of ships to place (from server to client), then the orientations of those ships (when returning to the server)
 
   public PayloadType getPayloadType() { return payloadType; }
 
@@ -41,9 +43,13 @@ public class Payload implements Serializable {
 
   public Object[] getOpponentBoards() { return opponentBoards.values().toArray(); }
 
-  public void setPosition(int[][] position) { this.position = position; }
+  public void setPosition(String target, int[][] position) { this.positionMap.put(target, position); }
 
-  public int[][] getPosition() { return position; }
+  public int[][] getPosition(String target) { return positionMap.get(target); }
+
+  public void setOtherData(Object[] data) { this.otherData = data; }
+
+  public Object[] getOtherData() { return otherData; }
 
   @Override
   public String toString() {

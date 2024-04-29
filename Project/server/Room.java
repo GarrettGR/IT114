@@ -160,14 +160,12 @@ public class Room implements AutoCloseable {
             break;
           case GAME_LIST:
             StringBuilder gameList = new StringBuilder();
-            gameList.append("Games: \n");
-            for (BattleshipThread game : games) {
-              gameList.append(game.getName());
-              if (games.indexOf(game) < games.size() - 1) gameList.append("\n");
-            }
+            gameList.append("Games:");
+            for (BattleshipThread game : games) gameList.append("\n" + game.getName());
             client.sendMessage("Server", gameList.toString());
             break;
           case GAME_START:
+            info("Starting game.");
             boolean hardDifficulty = false;
             boolean salvoGameMode = false;
             List<String> targetUsers = new ArrayList<String>();
@@ -180,7 +178,7 @@ public class Room implements AutoCloseable {
                 salvoGameMode = true;
               }
             }
-            BattleshipThread newGame = new BattleshipThread(hardDifficulty, salvoGameMode);
+            BattleshipThread newGame = new BattleshipThread(this, hardDifficulty, salvoGameMode);
             newGame.addPlayer(client);
             for (String targetUser : targetUsers)
               for (ServerThread c : clients)
