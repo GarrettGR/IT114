@@ -155,6 +155,9 @@ public class Client {
       System.out.flush();
       system_print("Console cleared");
       return true;
+    } else if (text.startsWith("/joingame")) {
+        sendGameEvent(PayloadType.GAME_START, text.trim().split(" ")[1]);
+        // TODO: Have the room recieve the GAMESTART and get the thread with the proper GameID and add the player to the game -- have the game thread wait 30 seconds before starting to let players join
     } else if (isGameEvent(text)) {
       String[] parts = text.trim().replaceAll(" +", " ").split(" ");
       if (parts[0].equalsIgnoreCase("/place")) {
@@ -218,15 +221,26 @@ public class Client {
     Payload p = new Payload();
     p.setPayloadType(type);
     p.setClientName(clientName);
-    if (type == PayloadType.GAME_PLACE) { //place [ship] [row] [column] [direction]
-      p.setPosition(String.valueOf(clientName), position.toArray(new int[position.size()][]));
-      p.setOtherData(directions.toArray());
-    } else if (type == PayloadType.GAME_TURN) { //handle multiple attacks (one for each player) & salvo gameMode
-      int[][] position = {{Integer.parseInt((String) data[1]), Integer.parseInt((String) data[2])}};
-      p.setPosition(String.valueOf(data[0]), position);
-    } else {
+    if (null == type) {
       system_error("Invalid game event");
       return;
+    } else switch (type) {
+      case GAME_START -> {
+        p.setNumber((long) data[0]);
+      }
+      case GAME_PLACE -> {
+        p.setPosition(String.valueOf(clientName), position.toArray(int[][]::new));
+        p.setOtherData(directions.toArray());
+      }
+      case GAME_TURN -> {
+        //handle multiple attacks (one for each player) & salvo gameMode
+        int[][] position = {{Integer.parseInt((String) data[1]), Integer.parseInt((String) data[2])}};
+        p.setPosition(String.valueOf(data[0]), position);
+      }
+      default -> {
+        system_error("Invalid game event");
+        return;
+      }
     }
     sendPayload(p);
   }

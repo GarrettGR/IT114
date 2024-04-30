@@ -1,14 +1,13 @@
 package Project.server;
 
+import Project.common.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.concurrent.Callable;
-
-import Project.common.*;
 
 public class BattleshipThread extends Thread {
   private Room room;
@@ -81,6 +80,8 @@ public class BattleshipThread extends Thread {
     for (ServerThread player : players.keySet()) if (player.getClientName().equals(name)) return true;
     return false;
   }
+
+  protected List<ServerThread> getPlayers() { return new ArrayList<>(players.keySet()); }
 
   protected boolean hasSpectator(ServerThread spectator) { return spectators.contains(spectator); }
 

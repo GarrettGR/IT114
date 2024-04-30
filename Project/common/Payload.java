@@ -9,7 +9,7 @@ public class Payload implements Serializable {
   private PayloadType payloadType;
   private String clientName;
   private String message;
-  private int number;
+  private long number;
   private PieceType[][] playerBoard;
   private Map<String, PieceType[][]> opponentBoards = new HashMap<>();
   private Map<String, int[][]> positionMap = new HashMap<>();
@@ -27,9 +27,9 @@ public class Payload implements Serializable {
 
   public void setMessage(String message) { this.message = message; }
 
-  public int getNumber() { return number; }
+  public long getNumber() { return number; }
 
-  public void setNumber(int number) { this.number = number; }
+  public void setNumber(long number) { this.number = number; }
 
   public void setPlayerBoard(PieceType[][] board) { this.playerBoard = board; }
 

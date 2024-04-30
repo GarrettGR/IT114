@@ -161,13 +161,17 @@ public class Room implements AutoCloseable {
           case GAME_LIST:
             StringBuilder gameList = new StringBuilder();
             gameList.append("Games:");
-            for (BattleshipThread game : games) gameList.append("\n" + game.getName());
+            for (BattleshipThread game : games) {
+              gameList.append("\n GameID [" + game.threadId() + "] : " + game.getPlayers().size() + " players : ");
+              for(ServerThread player : game.getPlayers()) gameList.append("\n  - " + player.getClientName());
+            }
             client.sendMessage("Server", gameList.toString());
             break;
           case GAME_START:
             info("Starting game.");
             boolean hardDifficulty = false;
             boolean salvoGameMode = false;
+            StringBuilder gameStartMsg = new StringBuilder();
             List<String> targetUsers = new ArrayList<String>();
             for (String messagePart : comm2) {
               if (messagePart.startsWith("@")) {
@@ -180,10 +184,21 @@ public class Room implements AutoCloseable {
             }
             BattleshipThread newGame = new BattleshipThread(this, hardDifficulty, salvoGameMode);
             newGame.addPlayer(client);
+            gameStartMsg.append(client.getClientName() + " is inviting you to play a game of battleship (GameID [" + newGame.threadId() + "])\n");
+            gameStartMsg.append("Game mode: " + (salvoGameMode ? "Salvo" : "Classic") + " | " + (hardDifficulty ? "Hard" : "Easy") + "\n");
+            gameStartMsg.append("To join, type /joingame " + newGame.threadId());
+            if (targetUsers.isEmpty())
+              for(ServerThread clnt : clients){
+                if (clnt.getClientName().equals(client.getClientName())) continue;
+                clnt.sendMessage("Server", gameStartMsg.toString());
+              }
             for (String targetUser : targetUsers)
-              for (ServerThread c : clients)
-                if (c.getClientName().equals(targetUser))
-                  newGame.addPlayer(c); //TODO: Add check for if player is already in a game / wants to play
+              for (ServerThread clnt : clients){
+                if (clnt.getClientName().equals(targetUser)){
+                  clnt.sendMessage("Server", gameStartMsg.toString());
+                  newGame.addPlayer(clnt);
+                }
+              }
             games.add(newGame);
             break;
           case DISCONNECT:
