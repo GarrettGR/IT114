@@ -1,6 +1,8 @@
 package Project.common;
 
-public class GameBoard {
+import java.io.Serializable;
+
+public class GameBoard implements Serializable{
   private static final int BOARD_SIZE = 10;
   private PieceType[][] board = new PieceType[BOARD_SIZE][BOARD_SIZE];
   private String clientName;

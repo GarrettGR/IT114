@@ -150,7 +150,7 @@ public class Client {
         system_print("Console cleared");
         return true;
       case "/joingame":
-        sendGameEvent(PayloadType.GAME_START, Long.parseLong(parts[1]));
+        sendGameEvent(PayloadType.GAME_START, parts[1]);
         return true;
       case "/place":
         placeShips(parts); // TODO: fix after refactoring
@@ -243,7 +243,7 @@ public class Client {
       system_error("Invalid game event");
       return;
     } else switch (type) {
-      case GAME_START -> p.setNumber(Long.parseLong((String) data[0]));
+      case GAME_START -> p.setNumber(Long.parseLong( (String) data[0]));
       case GAME_PLACE -> {
         for (Object datum : data) p.addShip((Ship) datum); //? can I fo p.setShips( (ship[]) data) instead -- if I pass it a list of ships (?)
       }

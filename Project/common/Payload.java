@@ -2,9 +2,9 @@ package Project.common;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 public class Payload implements Serializable {
   private static final long serialVersionUID = 1L;
@@ -76,16 +76,8 @@ public class Payload implements Serializable {
     }
   }
 
-  public void setCoordinates(String key, List<Integer[]> list) { coordinates.put(key, list); }
-
-  // public void addCoordinate(Integer[] coordinate) { coordinates.add(coordinate); }
-
-  // public void setCoordinates(List<Integer[]> coordinates) { this.coordinates = coordinates; }
-
-  // public Integer[][] getCoordinates() { return coordinates.toArray(Integer[][]::new); }
-
-  @Override
-  public String toString() {
-     return String.format("Type[%s], Number[%s], Message[%s]", getPayloadType().toString(), getNumber(), getMessage());
-  }
+    @Override
+    public String toString() {
+      return String.format("Type[%s], Number[%s], Message[%s], Name[%s]\nPlayerBoard[%s], OpBoard[%s], ships[%s], Coords[%s]", getPayloadType().toString(), getNumber(), getMessage(), getClientName(), getPlayerBoard() != null ? "true" : "false", getOpponentBoards() != null ? "true" : "false", getShips() != null ? "true" : "false", getCoordinates() != null ? "true" : "false");
+    }
 }

@@ -34,3 +34,90 @@ Data:
 TODO:
 - only sends a message when using /name -- when using /rename it doesnt, and only works if connected to a server
 - It creates the battleship thread, but then nothing happens
+
+Old BattleshipThread run():
+run(){
+    for (ServerThread player : players.keySet()) {
+        Callable<Boolean> playerPlaceShip = () -> {
+            Payload p = new Payload();
+            p.setPayloadType(PayloadType.GAME_PLACE);
+            StringBuilder message = new StringBuilder("Place your ships: ");
+            message.append("ShipName : [Length, Quantity]");
+            for (String ship : ShipData.keySet()) 
+                message.append(String.format("%s : %d, ", ship, ShipData.get(ship)));  TODO: Format better (easier to read)
+            p.setMessage(message.toString());
+            p.setPlayerBoard(EMPTY_BOARD);
+            List<Object> data = new ArrayList<>();
+            for (Map.Entry<String, Integer[]> entry : ShipData.entrySet()) {
+                data.add(entry.getKey());
+                data.add(entry.getValue());
+            }
+            p.setOtherData(data.toArray());
+            player.sendGameEvent(p);
+            while (!hasPlacedShips(player)) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            return true;
+        };
+        TimedEvent placeShip = new TimedEvent(playerPlaceShip, () -> {
+            TODO: Query for a gamestate? (even if not all ships have been placed, those that have will be used)
+            addSpectator(player);
+            removePlayer(player);
+        }, 90);
+        placeShip.start();
+    }
+
+    Random random = new Random();
+    List<ServerThread> playerOrder = new ArrayList<>(players.keySet());
+    Collections.shuffle(playerOrder, random);
+
+    while (isRunning) {
+        if (players.size() == 0) isRunning = false;
+        for (ServerThread player : playerOrder) {
+            Callable<Boolean> playerTakeTurn = () -> {
+                Payload p = new Payload();
+                p.setPayloadType(PayloadType.GAME_STATE);
+                p.setPlayerBoard(players.get(player));
+                for (ServerThread opponent : players.keySet())
+                    if (opponent != player) p.addOpponentBoard(opponent.getClientName(), players.get(opponent));
+                p.setMessage("Take your turn");
+                player.sendGameEvent(p);
+                return true;
+            };
+
+            TimedEvent takeTurn = new TimedEvent(playerTakeTurn, () -> {
+            Payload p = new Payload();
+            p.setPayloadType(PayloadType.GAME_MESSAGE);
+            p.setMessage("You took too long to take your turn");
+            player.sendGameEvent(p);
+            }, 90);
+            takeTurn.start();
+        }
+        for (ServerThread player : players.keySet()) {
+            boolean noShips = hasPlacedShips(player);
+            if (noShips) {
+                addSpectator(player);
+                removePlayer(player);
+            }
+        }
+        if (players.size() == 1) {
+            ServerThread winner = players.keySet().iterator().next();
+            for (ServerThread spectator : spectators) {
+                Payload p = new Payload();
+                p.setPayloadType(PayloadType.GAME_MESSAGE);
+                p.setMessage(winner.getClientName() + " has won the game!");
+                spectator.sendGameEvent(p);
+            }
+            Payload p = new Payload();
+            p.setPayloadType(PayloadType.GAME_MESSAGE);
+            p.setMessage("You have won the game!");
+            winner.sendGameEvent(p);
+            System.out.println("Game over, " + winner.getClientName() + " has won the game!");
+            isRunning = false;
+        }
+    }
+}

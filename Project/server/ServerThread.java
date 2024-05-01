@@ -12,7 +12,7 @@ public class ServerThread extends Thread {
   private boolean isRunning = false;
   private ObjectOutputStream out;
   private Room currentRoom;
-  private GameBoard gameBoard;
+  private GameBoard gameBoard = new GameBoard();
   private boolean isAway = false;
   private boolean isReady = false;
   

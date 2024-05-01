@@ -124,7 +124,10 @@ public class BattleshipThread extends Thread {
     }
   }
 
-  protected synchronized void addPlayer(ServerThread player) { if (!started) players.add(player); }
+  protected synchronized void addPlayer(ServerThread player) { 
+    if (players.size() >= 4) player.sendMessage("Game", "Game is full, cannot join");
+    if (!started) players.add(player); 
+  }
 
   protected synchronized void addSpectator(ServerThread spectator) { spectators.add(spectator); }
 
@@ -193,93 +196,42 @@ public class BattleshipThread extends Thread {
     if (!hardDifficulty) hardDifficulty = false;
     if (!salvoGameMode) salvoGameMode = false;
 
-    // TODO: give all players a chance to place their ships (90 seconds or when all players have placed)
+    long elapsedTime = 0;
 
-    // for (ServerThread player : players.keySet()) {
-    //   Callable<Boolean> playerPlaceShip = () -> {
-    //     Payload p = new Payload();
-    //     p.setPayloadType(PayloadType.GAME_PLACE);
-    //     StringBuilder message = new StringBuilder("Place your ships: ");
-    //     message.append("ShipName : [Length, Quantity]");
-    //     for (String ship : ShipData.keySet())
-    //       message.append(String.format("%s : %d, ", ship, ShipData.get(ship))); // TODO: Format better (easier to read)
-    //     p.setMessage(message.toString());
-    //     p.setPlayerBoard(EMPTY_BOARD);
-    //     List<Object> data = new ArrayList<>();
-    //     for (Map.Entry<String, Integer[]> entry : ShipData.entrySet()) {
-    //         data.add(entry.getKey());
-    //         data.add(entry.getValue());
-    //     }
-    //     p.setOtherData(data.toArray());
-    //     player.sendGameEvent(p);
-    //     while (!hasPlacedShips(player)) {
-    //       try {
-    //         Thread.sleep(500);
-    //       } catch (InterruptedException e) {
-    //         e.printStackTrace();
-    //       }
-    //     }
-    //     return true;
-    //   };
-    //   TimedEvent placeShip = new TimedEvent(playerPlaceShip, () -> {
-    //     // TODO: Query for a gamestate? (even if not all ships have been placed, those that have will be used)
-    //     addSpectator(player);
-    //     removePlayer(player);
-    //   }, 90);
-    //   placeShip.start();
-    // }
+    while (elapsedTime < 30000) {
+      try {
+        Thread.sleep(1000); // sleep for 1 second
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      elapsedTime += 1000;
+      if (players.size() == room.getClients().size()) break;
+    }
 
-    // Random random = new Random();
-    // List<ServerThread> playerOrder = new ArrayList<>(players.keySet());
-    // Collections.shuffle(playerOrder, random);
+    System.out.println("Game starting");
 
-    // while (isRunning) {
-    //   if (players.size() == 0) isRunning = false;
-    //   for (ServerThread player : playerOrder) {
-    //     Callable<Boolean> playerTakeTurn = () -> {
-    //       Payload p = new Payload();
-    //       p.setPayloadType(PayloadType.GAME_STATE);
-    //       p.setPlayerBoard(players.get(player));
-    //       for (ServerThread opponent : players.keySet())
-    //         if (opponent != player) p.addOpponentBoard(opponent.getClientName(), players.get(opponent));
-    //       p.setMessage("Take your turn");
-    //       player.sendGameEvent(p);
+    for (ServerThread player : players) {
+      Payload p = new Payload();
+      p.setPayloadType(PayloadType.GAME_START);
+      p.setClientName("Game");
+      p.setMessage("Game starting");
+      p.setNumber((int) players.size());
+      player.sendGameEvent(p);
+    }
 
-    //       // TODO: Wait for the player to take their turn, return true if they took their turn
-
-    //       return true;
-    //     };
-
-    //     TimedEvent takeTurn = new TimedEvent(playerTakeTurn, () -> {
-    //       Payload p = new Payload();
-    //       p.setPayloadType(PayloadType.GAME_MESSAGE);
-    //       p.setMessage("You took too long to take your turn");
-    //       player.sendGameEvent(p);
-    //     }, 90);
-    //     takeTurn.start();
-    //   }
-    //   for (ServerThread player : players.keySet()) {
-    //     boolean noShips = hasPlacedShips(player);
-    //     if (noShips) {
-    //       addSpectator(player);
-    //       removePlayer(player);
-    //     }
-    //   }
-    //   if (players.size() == 1) {
-    //     ServerThread winner = players.keySet().iterator().next();
-    //     for (ServerThread spectator : spectators) {
-    //       Payload p = new Payload();
-    //       p.setPayloadType(PayloadType.GAME_MESSAGE);
-    //       p.setMessage(winner.getClientName() + " has won the game!");
-    //       spectator.sendGameEvent(p);
-    //     }
-    //     Payload p = new Payload();
-    //     p.setPayloadType(PayloadType.GAME_MESSAGE);
-    //     p.setMessage("You have won the game!");
-    //     winner.sendGameEvent(p);
-    //     System.out.println("Game over, " + winner.getClientName() + " has won the game!");
-    //     isRunning = false;
-    //   }
-    // }
+    for (ServerThread player : players) {
+      Payload p = new Payload();
+      p.setPayloadType(PayloadType.GAME_PLACE);
+      p.setClientName("Game");
+      p.setMessage("Place your ships");
+      p.setPlayerBoard(player.getGameBoard());
+      for (ShipType type : shipCounts.keySet()) {
+        for (int i = 0; i < shipCounts.get(type); i++) {
+          Ship ship = new Ship(type);
+          p.addShip(ship);
+        }
+      }
+      player.sendGameEvent(p);
+    }
   }
 }

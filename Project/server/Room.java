@@ -7,9 +7,9 @@ import java.util.List;
 
 public class Room implements AutoCloseable {
   protected static Server server;
-  private String name;
-  private List<ServerThread> clients = new ArrayList<ServerThread>();
-  private List<BattleshipThread> games = new ArrayList<BattleshipThread>();
+  private final String name;
+  private List<ServerThread> clients = new ArrayList<>();
+  private List<BattleshipThread> games = new ArrayList<>();
   private boolean isRunning = false;
 
   private final static String COMMAND_TRIGGER = "/";
@@ -17,7 +17,7 @@ public class Room implements AutoCloseable {
   private final static String CREATE_ROOM = "createroom";
   private final static String JOIN_ROOM = "joinroom";
   private final static String DISCONNECT = "disconnect";
-  private final static String LOGOUT = "logout";
+  private final static String LEAVE_ROOM = "leaveroom";
   private final static String LOGOFF = "logoff";
   private final static String USERS = "users";
   private final static String RENAME = "rename";
@@ -151,7 +151,7 @@ public class Room implements AutoCloseable {
                 finalMsg.append("Private message with: ");
                 finalMsg.append(client.getClientName());
                 for (String targetName : targetNames) if (!targetName.equals(target.getClientName())) finalMsg.append(", " + targetName);
-                finalMsg.append("\n" + client.getClientName() + ": " + privMsg.toString());
+                finalMsg.append("\n\u001B[32m" + client.getClientName() + ": " + privMsg.toString());
                 target.sendMessage("Server", finalMsg.toString());
               }
               client.sendMessage("Server", "Message sent to " + targets.size() + String.format(" user(s): %s", targetNames));
@@ -202,12 +202,12 @@ public class Room implements AutoCloseable {
                   newGame.addPlayer(clnt);
                 }
               }
-            newGame.start(); // wait for 30 seconds to start the game? (TimedEvent)
+            newGame.start();
             games.add(newGame);
             break;
-          case DISCONNECT:
-          case LOGOUT:
-          case LOGOFF:
+          case LEAVE_ROOM:
+            Room.joinRoom("Lobby", client);
+          case DISCONNECT, LOGOFF:
             Room.disconnectClient(client, this);
             break;
           default:
