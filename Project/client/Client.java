@@ -7,9 +7,7 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 
 public class Client {
@@ -51,14 +49,15 @@ public class Client {
       /help - Show this help message
       """;
   private static final String GAME_HELP = """
-      /attack [player] [row] [column] - Attack a position on the board of that player
+      /attack @[player] [row] [column] - Attack a position on the board of that player
       /place [ship] [row] [column] [direction] - Place a ship on your board
       note: with one end at the location provided, direction = 'up', 'down', 'left', 'right'
 
       /spectate - Stop playing and watch the game instead
       /clear - Clear the console
       /quit - Exit the program
-      /help - Show this help message""";
+      /help - Show this help message
+      """;
 
   final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
   final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
@@ -67,9 +66,9 @@ public class Client {
   private Thread inputThread;
   private Thread fromServerThread;
   private String clientName = "";
-  private Map<String, Integer[]> ships = new HashMap<>();
-  private List<int[]> position = new ArrayList<>();
-  private List<String> directions = new ArrayList<>();
+  private List<Ship> ships = new ArrayList<>();
+  private List<int[]> position = new ArrayList<>(); //? redundant?
+  private int numPlayers;
 
   // --- Start of Boilerplate ---
 
@@ -89,37 +88,11 @@ public class Client {
   // --- Start of Checkers ---
 
   public boolean isConnected() {
-    if (server == null)
-      return false;
+    if (server == null) return false;
     return server.isConnected() && !server.isClosed() && !server.isInputShutdown() && !server.isOutputShutdown();
   }
 
   private boolean isConnection(String text) { return text.matches(ipAddressPattern) || text.matches(localhostPattern); }
-
-  private boolean isName(String text) {
-    if (text.startsWith("/name")) {
-      String[] parts = text.split(" ");
-      if (parts.length >= 2) {
-        clientName = parts[1].trim();
-        system_print("Name set to " + clientName);
-      }
-      return true;
-    }
-    return false;
-  }
-
-  private boolean isQuit(String text) { return text.equalsIgnoreCase("/quit"); }
-
-  private boolean isHelp(String text) { return text.equalsIgnoreCase("/help"); }
-
-  private boolean isClear(String text) { return text.equalsIgnoreCase("/clear"); }
-
-  private boolean isGameEvent(String text) { 
-      return switch (text.toLowerCase().split(" ")[0]) {
-          case "/place", "/attack", "/spectate" -> true;
-          default -> false;
-      };
-  }
 
   // --- Start of Formatters ---
 
@@ -140,97 +113,98 @@ public class Client {
   // --- Start of Client Input handling ---
 
   private boolean processCommand(String text) {
-    text = text.toLowerCase();
-    if (isConnection(text)) {
-      if (clientName.isBlank()) system_print("You can set your name by using: /name your_name");
-      String[] parts = text.trim().replaceAll(" +", " ").split(" ")[1].split(":");
-      connect(parts[0].trim(), Integer.parseInt(parts[1].trim()));
-      return true;
-    } else if (isQuit(text)) {
-      isRunning = false;
-      return true;
-    } else if (isName(text) && !isConnected()) {
-      return true;
-    } else if (isHelp(text)) {
-      if (inGame) system_print(GAME_HELP);
-      else system_print(HELP);
-      return true;
-    } else if (isClear(text)) {
-      System.out.print(UNIX_CLEAR);
-      System.out.flush();
-      system_print("Console cleared");
-      return true;
-    } else if (text.startsWith("/joingame")) {
-      sendGameEvent(PayloadType.GAME_START, text.trim().split(" ")[1]);
-        // TODO: Have the room recieve the GAMESTART and get the thread with the proper GameID and add the player to the game -- have the game thread wait 30 seconds before starting to let players join
-    } else if (isGameEvent(text)) {
-      String[] parts = text.trim().replaceAll(" +", " ").split(" ");
-      if (parts[0].equalsIgnoreCase("/place")) {
-        while(!ships.isEmpty()) placeShips(parts);
-        sendGameEvent(PayloadType.GAME_PLACE);
-      } else if (parts[0].equalsIgnoreCase("/attack")) {
-        sendGameEvent(PayloadType.GAME_TURN, parts[1], parts[2], parts[3]);
-      } else if (parts[0].equalsIgnoreCase("/spectate")) {
-        // handle spectate command
-      } else {
-        system_error("Invalid game event");
-      }
-      return true;
+    text = text.toLowerCase().trim();
+    String[] parts = text.replaceAll(" +", " ").split(" ");
+    switch (parts[0]) {
+      case "/connect":
+        if (isConnected()) {
+          system_error("Already connected to a server");
+          return true;
+        } else if (!isConnection(text)) {
+          system_error("Invalid connection command");
+          return true;
+        }
+        if (clientName.isBlank()) system_print("You can set your name by using: /name your_name");
+        String[] connectionParts = parts[1].split(":");
+        connect(connectionParts[0].trim(), Integer.parseInt(connectionParts[1].trim()));
+        return true;
+      case "/quit":
+        isRunning = false;
+        return true;
+      case "/name", "/rename":
+        if (parts.length != 2) {
+          system_error("Invalid name command");
+          return true;
+        }
+        if (isConnected()) return false;
+        clientName = parts[1];
+        system_print("Name set to: " + clientName);
+        return true;
+      case "/help":
+        if (inGame) system_print(GAME_HELP);
+        else system_print(HELP);
+        return true;
+      case "/clear":
+        System.out.print(UNIX_CLEAR);
+        System.out.flush();
+        system_print("Console cleared");
+        return true;
+      case "/joingame":
+        sendGameEvent(PayloadType.GAME_START, Long.parseLong(parts[1]));
+        return true;
+      case "/place":
+        placeShips(parts); // TODO: fix after refactoring
+      case "/attack":
+        if (parts.length != 4) {
+          system_error("Invalid attack command");
+        } else {
+          attackPlayer(parts[1].substring(1), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+        } 
     }
     return false;
-  }
+}
 
   // --- Start of Game Logic ---
 
-  private void placeShips(String[] parts){
-    system_print("Place your ships");
-    system_print("Available ships: ");
-    for (Map.Entry<String, Integer[]> ship : ships.entrySet()) {
-      system_print(ship.getValue()[1] + "x " + ship.getKey() + ": " + ship.getValue()[0]);
-    }
-    system_print("Place ships by typing: /place [ship] [row] [column] [direction]");
-    system_print("Example: /place Carrier 1 1 right");
-
-    if (parts.length != 4) {
+  private void placeShips(String[] parts) { //place [ship] [row] [column] [direction]
+    if (parts.length != 5) {
       system_error("Invalid ship placement");
+      return;
     }
-    if (ships.containsKey(parts[1])) {
-      position.add(new int[]{Integer.parseInt(parts[2]), Integer.parseInt(parts[3])});
-      directions.add(parts[4]);
-      removeShip(parts[1]);
+    for (Ship ship : ships) {
+      if (ship.getType().getName().equalsIgnoreCase(parts[1])) {
+        ship.setAnchorY(Integer.valueOf(parts[2]));
+        ship.setAnchorX(Integer.valueOf(parts[3]));
+        ship.setOrientation(parts[4].toLowerCase());
+        sendGameEvent(PayloadType.GAME_PLACE, ship);
+        system_print("Placed " + ship.getType().getName() + " at " + parts[2] + ", " + parts[3] + " facing " + parts[4]);
+        break;
+      } else {
+        system_error("You don't have that ship left to place");
+        return;
+      }
+    }
+    if (!ships.isEmpty()) {
+      system_print("You have ships left to place: ");
+      for (Ship ship : ships) {
+        system_print("  - " + ship.getType().getName() + " : " + ship.getType().getLength());
+      }
     } else {
-      system_error("You don't have that ship left to place");
+      system_print("All ships placed");
     }
-
   }
 
-  private void removeShip(String ship) {
-    ships.get(ship)[1]--;
-    if (ships.get(ship)[1] == 0) ships.remove(ship);
-  }
-
-  private void drawBoard(PieceType[][] board) {
+  private void drawBoard(GameBoard board) {
     final char EMPTY_SPACE = ' ';
-
-    for (PieceType[] row : board) {
+    for (PieceType[] row : board.getBoard()) {
       System.out.print(' ');
       for (PieceType piece : row) {
         game_print("[");
         switch (piece) {
-          case EMPTY:
-            System.out.print(EMPTY_SPACE + "");
-            break;
-          case SHIP:
-            System.out.print(SQUARE);
-            break;
-          case HIT:
-            System.out.print(ANSI_RED + SQUARE + ANSI_RESET);
-            break;
-          case MISS:
-            game_print("X");
-            break;
-          default:
-            break;
+          case EMPTY -> System.out.print(EMPTY_SPACE);
+          case SHIP -> System.out.print(SQUARE);
+          case HIT -> System.out.print(ANSI_RED + SQUARE + ANSI_RESET);
+          case MISS -> game_print("X");
         }
         game_print("]");
       }
@@ -238,9 +212,9 @@ public class Client {
     }
   }
 
-  private void drawGame(PieceType[][] playerBoard, Object[] oponnentBoards) {
-    for (Object obj : oponnentBoards) {
-      PieceType[][] board = (PieceType[][]) obj;
+  private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards) {
+    System.out.print(ANSI_RESET + UNIX_CLEAR);
+    for (GameBoard board : opponentBoards) {
       drawBoard(board);
       System.out.print(' ');
       for (int i = 0; i < 30; i++) game_print("-");
@@ -248,6 +222,17 @@ public class Client {
     }
     System.out.println("\nYour board:");
     drawBoard(playerBoard);
+  }
+
+  private void attackPlayer(String target, int row, int column) {
+    // TODO: be able to attack once for each opponent
+    // TODO: validate that the attack is valid
+      // - check if the target is a valid player
+      // - check if the row & column are within the board
+      // - check if it is the player's turn
+      // - check if the target is not the player
+      // - check if the target has not been attacked before (that turn)
+    
   }
 
   private void sendGameEvent(PayloadType type, Object ... data){
@@ -258,18 +243,12 @@ public class Client {
       system_error("Invalid game event");
       return;
     } else switch (type) {
-      case GAME_START -> {
-        p.setMessage("Joining Game"); 
-        p.setNumber(Long.parseLong((String) data[0]));
-      }
+      case GAME_START -> p.setNumber(Long.parseLong((String) data[0]));
       case GAME_PLACE -> {
-        p.setPosition(clientName, position.toArray(int[][]::new));
-        p.setOtherData(directions.toArray());
+        for (Object datum : data) p.addShip((Ship) datum); //? can I fo p.setShips( (ship[]) data) instead -- if I pass it a list of ships (?)
       }
       case GAME_TURN -> {
-        //handle multiple attacks (one for each player) & salvo gameMode
-        int[][] position = {{Integer.parseInt((String) data[1]), Integer.parseInt((String) data[2])}};
-        p.setPosition(String.valueOf(data[0]), position);
+        p.addCoordinate((String) data[0], new Integer[]{(int) data[1], (int) data[2]});
       }
       default -> {
         system_error("Invalid game event");
@@ -344,7 +323,6 @@ public class Client {
       public void run() {
         try {
           Payload fromServer;
-
           while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processMessage(fromServer);
           system_error("Loop exited");
         } catch (Exception e) {
@@ -365,37 +343,23 @@ public class Client {
 
   private void processMessage(Payload p) {
     switch (p.getPayloadType()) {
-      case CONNECT:
-      case DISCONNECT:
-        system_print(String.format("*%s %s*",
-            p.getClientName(),
-            p.getMessage()));
-        break;
-      case MESSAGE:
-        server_print(String.format("%s: %s",
-            p.getClientName(),
-            p.getMessage()));
-        break;
-      case GAME_START: // Have this with GAME_PLACE instead?
-        system_print("Game starting");
-        inGame = true;
-        break;
-      case GAME_STATE: // Move this into GAME_START instead?
-        drawGame(p.getPlayerBoard(), p.getOpponentBoards());
-        break;
-      case GAME_PLACE:
-        Object[] data = p.getOtherData();
-        for (int i = 0; i < data.length; i += 2) {
-          String key = (String) data[i];
-          Integer[] value = (Integer[]) data[i + 1];
-          ships.put(key, value);
-        }
+      case CONNECT, DISCONNECT -> system_print(String.format("*%s %s*", p.getClientName(), p.getMessage()));
+      case MESSAGE -> server_print(String.format("%s: %s", p.getClientName(), p.getMessage()));
+      case GAME_PLACE -> {
         system_print(p.getMessage());
+        ships = p.getShipList();
         drawBoard(p.getPlayerBoard());
-        break;
-      case PING:
-      default:
-        break;
+      }
+      case GAME_START -> {
+        system_print("Game started with " + p.getNumber() + " players");
+        numPlayers = (int) p.getNumber();
+        inGame = true;
+      }
+      case GAME_STATE -> drawGame(p.getPlayerBoard(), p.getOpponentBoards());
+      case PING -> {
+        // do nothing 
+      }
+      default -> throw new IllegalArgumentException("Unexpected value: " + p.getPayloadType());
     }
   }
 

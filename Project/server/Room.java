@@ -21,6 +21,7 @@ public class Room implements AutoCloseable {
   private final static String LOGOFF = "logoff";
   private final static String USERS = "users";
   private final static String RENAME = "rename";
+  private final static String NAME = "name";
   private final static String PM = "pm";
   private final static String GAME_PLAY = "play";
   private final static String GAME_LIST = "games";
@@ -92,10 +93,9 @@ public class Room implements AutoCloseable {
             break;
           case LIST_ROOMS:
             StringBuilder rooms = new StringBuilder();
-            rooms.append("Rooms: \n");
+            rooms.append("Rooms:");
             for (String room : server.listRoomNames()) {
-              rooms.append(room);
-              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n");
+              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n" +room);
             }
             client.sendMessage("Server", rooms.toString());
             break;
@@ -108,7 +108,7 @@ public class Room implements AutoCloseable {
             }
             client.sendMessage("Server",list.toString());
             break;
-          case RENAME:
+          case RENAME, NAME:
             String newName = comm2[1];
             if (!isTakenName(newName)) {
               client.setClientName(newName);
@@ -167,6 +167,10 @@ public class Room implements AutoCloseable {
             client.sendMessage("Server", gameList.toString());
             break;
           case GAME_PLAY:
+            if (name.equalsIgnoreCase("lobby")) {
+              client.sendMessage("Server", "You can't start a game in the lobby, create a private room first");
+              break;
+            }
             info("Starting game.");
             boolean hardDifficulty = false;
             boolean salvoGameMode = false;
@@ -256,9 +260,7 @@ public class Room implements AutoCloseable {
     while (iter.hasNext()) {
       BattleshipThread game = iter.next();
       if (game == null) continue;
-      if (game.hasPlayer(player)) {
-        game.pushPayload(player, payload);
-      }
+      if (game.hasPlayer(player)) player.sendGameEvent(payload);
     }
   }
 
@@ -267,6 +269,7 @@ public class Room implements AutoCloseable {
     Iterator<ServerThread> iter = clients.iterator();
     while (iter.hasNext()) {
       ServerThread client = iter.next();
+      if (sender.getClientName().equals(client.getClientName())) continue;
       boolean messageSent = client.sendConnectionStatus(sender.getClientName(), isConnected);
       if (!messageSent) handleDisconnect(iter, client);
     }

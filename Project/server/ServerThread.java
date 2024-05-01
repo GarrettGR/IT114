@@ -7,15 +7,17 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 public class ServerThread extends Thread {
-  private Socket client;
+  private final Socket client;
   private String clientName;
   private boolean isRunning = false;
   private ObjectOutputStream out;
   private Room currentRoom;
+  private GameBoard gameBoard;
+  private boolean isAway = false;
+  private boolean isReady = false;
+  
 
-  private void info(String message) {
-    System.out.println(String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message));
-  }
+  private void info(String message) { System.out.println(String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message)); }
 
   public ServerThread(Socket myClient, Room room) {
     info("Thread created");
@@ -24,31 +26,34 @@ public class ServerThread extends Thread {
   }
 
   protected void setClientName(String name) {
-    if (name == null || name.isBlank() || currentRoom.isTakenName(name) || name.equalsIgnoreCase("Server")
-        || name.equalsIgnoreCase("null") || name.equalsIgnoreCase("Lobby")) {
+    if (name == null || name.isBlank() || currentRoom.isTakenName(name) || name.equalsIgnoreCase("Server") || name.equalsIgnoreCase("null") || name.equalsIgnoreCase("Lobby")) {
       System.err.println("Invalid client name being set");
       sendMessage("Server", "Invalid name chosen, auto-generating name");
       name = createClientName();
     }
-
     this.clientName = name;
   }
 
-  protected String getClientName() {
-    return clientName;
-  }
+  protected String getClientName() { return clientName; }
 
-  protected synchronized Room getCurrentRoom() {
-    return currentRoom;
-  }
+  protected synchronized Room getCurrentRoom() {  return currentRoom;  }
 
   protected synchronized void setCurrentRoom(Room room) {
-    if (room != null) {
-      currentRoom = room;
-    } else {
-      info("Passed in room was null, this shouldn't happen");
-    }
+    if (room != null) currentRoom = room;
+    else info("Passed in room was null, this shouldn't happen");
   }
+
+  protected synchronized void setGameBoard(GameBoard board) { gameBoard = board; }
+
+  protected GameBoard getGameBoard() { return gameBoard; }
+
+  protected boolean isAway() { return isAway; }
+
+  protected void setAway(boolean away) { isAway = away; }
+
+  protected boolean isReady() { return isReady; }
+
+  protected void setReady(boolean ready) { isReady = ready; }
 
   public void disconnect() {
     info("Thread being disconnected by server");
@@ -65,17 +70,7 @@ public class ServerThread extends Thread {
   }
 
   public void sendGameEvent(Payload p) {
-    switch (p.getPayloadType()) {
-      case GAME_START:
-      case GAME_STATE:
-        send(p);
-        break;
-      case GAME_MESSAGE:
-      case GAME_END:
-        sendMessage("Game", p.getMessage());
-      default:
-        break;
-    }
+    send(p);
   }
 
   public boolean sendPing() {
@@ -137,24 +132,15 @@ public class ServerThread extends Thread {
 
   void processMessage(Payload p) {
     switch (p.getPayloadType()) {
-      case CONNECT:
-        setClientName(p.getClientName());
-        break;
-      case DISCONNECT:// TBD
-        break;
-      case GAME_PLACE:
-      case GAME_TURN:
+      case CONNECT -> setClientName(p.getClientName());
+      case DISCONNECT -> disconnect();
+      case GAME_PLACE, GAME_TURN -> {
         if (currentRoom != null) currentRoom.sendGameEvent(this, p);
-        break;
-      case MESSAGE:
-        if (currentRoom != null) {
-          currentRoom.sendMessage(this, p.getMessage());
-        } else {
-          Room.joinRoom("lobby", this);
-        }
-        break;
-      default:
-        break;
+      }
+      case MESSAGE -> {
+        if (currentRoom != null) currentRoom.sendMessage(this, p.getMessage());
+        else  Room.joinRoom("lobby", this);
+      }
     }
   }
 
