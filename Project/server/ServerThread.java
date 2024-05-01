@@ -134,13 +134,20 @@ public class ServerThread extends Thread {
     switch (p.getPayloadType()) {
       case CONNECT -> setClientName(p.getClientName());
       case DISCONNECT -> disconnect();
+      case GAME_START -> {
+        if (currentRoom != null)
+          for (BattleshipThread game : currentRoom.getGames())
+            if (game.threadId() == p.getNumber())  game.addPlayer(this);
+      }
       case GAME_PLACE, GAME_TURN -> {
-        if (currentRoom != null) currentRoom.sendGameEvent(this, p);
+        if (currentRoom != null) currentRoom.pushGamePayload(this, p);
       }
       case MESSAGE -> {
         if (currentRoom != null) currentRoom.sendMessage(this, p.getMessage());
         else  Room.joinRoom("lobby", this);
       }
+      case PING -> { /* Do nothing */ }
+      default -> throw new IllegalArgumentException("Unexpected value: " + p.getPayloadType()); //? redundant
     }
   }
 

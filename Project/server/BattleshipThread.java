@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class BattleshipThread extends Thread {
   private final Room room;
@@ -12,6 +14,7 @@ public class BattleshipThread extends Thread {
   private boolean salvoGameMode;
   private boolean started;
   private boolean isRunning = false;
+  private CountDownLatch latch;
 
   private List<ServerThread> players = new ArrayList<>();
   private List<ServerThread> spectators = new ArrayList<>();
@@ -25,11 +28,12 @@ public class BattleshipThread extends Thread {
     ShipType.LIFE_BOAT, 0
   );
 
-  public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode) {
+  public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode, int playerCount) {
     this.hardDifficulty = hardDifficulty;
     this.salvoGameMode = salvoGameMode;
     this.room = room;
     System.out.println("Battleship game thread created");
+    this.latch = new CountDownLatch(playerCount);
   }
 
   public void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
@@ -62,22 +66,11 @@ public class BattleshipThread extends Thread {
 
   // private void sendGameEnd () {}
 
-  private void processPayload(ServerThread player, Payload payload) { // this should be for receiving a payload from a player (?)
+  public void processPayload(ServerThread player, Payload payload) { // this should be for receiving a payload from a player (?)
     switch (payload.getPayloadType()) {
-      case GAME_START -> {
-        if (started) return;
-        if (players.size() < 2) {
-          Payload p = new Payload();
-          p.setPayloadType(PayloadType.MESSAGE);
-          p.setClientName("Game");
-          p.setMessage("Not enough players to start the game");
-          player.sendGameEvent(p);
-          return;
-        }
-        started = true;
-      }
+      case GAME_START ->  addPlayer(player);
       case GAME_PLACE -> {
-        if (!started || hasPlacedShips(player)) return;
+        if (started || hasPlacedShips(player)) return;
         List<Ship> ships = payload.getShipList();
         if (!validateShipCounts(ships)) {
           sendGameMessage(player, "You cannot place any more ships");
@@ -94,7 +87,7 @@ public class BattleshipThread extends Thread {
         sendGameMessage(player, "You have placed your ships, waiting for other players");
       }
       case GAME_TURN -> {
-        if (!started || !hasPlacedShips(player)) return;
+        if (!started || !hasPlacedShips(player)) return; // make them a spectator -- send a message they can't do that?
         Map<String, List<Integer[]>> targetCoordinates = payload.getCoordinates();
         for (String name : targetCoordinates.keySet()) {
           List<Integer[]> coordinates = targetCoordinates.get(name);
@@ -125,8 +118,10 @@ public class BattleshipThread extends Thread {
   }
 
   protected synchronized void addPlayer(ServerThread player) { 
-    if (players.size() >= 4) player.sendMessage("Game", "Game is full, cannot join");
-    if (!started) players.add(player); 
+    if (!started) {
+      players.add(player);
+      latch.countDown();
+    }
   }
 
   protected synchronized void addSpectator(ServerThread spectator) { spectators.add(spectator); }
@@ -189,26 +184,9 @@ public class BattleshipThread extends Thread {
     return true;
   }
 
-  @Override
-  public void run() {
-    isRunning = true;
-    System.out.println("Battleship game thread started");
-    if (!hardDifficulty) hardDifficulty = false;
-    if (!salvoGameMode) salvoGameMode = false;
-
-    long elapsedTime = 0;
-
-    while (elapsedTime < 30000) {
-      try {
-        Thread.sleep(1000); // sleep for 1 second
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      elapsedTime += 1000;
-      if (players.size() == room.getClients().size()) break;
-    }
-
+  private void placementPhase() { // implement another latch for this? reuse the same latch?
     System.out.println("Game starting");
+    started = true;
 
     for (ServerThread player : players) {
       Payload p = new Payload();
@@ -233,5 +211,23 @@ public class BattleshipThread extends Thread {
       }
       player.sendGameEvent(p);
     }
+  }
+
+  @Override
+  public void run() {
+    isRunning = true;
+    System.out.println("Battleship game thread started");
+    if (!hardDifficulty) hardDifficulty = false;
+    if (!salvoGameMode) salvoGameMode = false;
+    
+    try {
+      if (!latch.await(300, TimeUnit.SECONDS)) {
+        placementPhase(); // if not all players join, start the game with the players that did
+      }
+      placementPhase(); // if all players join, start the game with all players without waiting
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+    isRunning = false;
   }
 }

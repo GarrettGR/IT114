@@ -51,7 +51,9 @@ public class Client {
   private static final String GAME_HELP = """
       /attack @[player] [row] [column] - Attack a position on the board of that player
       /place [ship] [row] [column] [direction] - Place a ship on your board
-      note: with one end at the location provided, direction = 'up', 'down', 'left', 'right'
+          note: with one end at the location provided, direction = 'up', 'down', 'left', 'right'
+      /ships - List the ships you have left to place
+      /board - Show your board
 
       /spectate - Stop playing and watch the game instead
       /clear - Clear the console
@@ -67,7 +69,9 @@ public class Client {
   private Thread fromServerThread;
   private String clientName = "";
   private List<Ship> ships = new ArrayList<>();
+  private List<Ship> placedShips = new ArrayList<>();
   private List<int[]> position = new ArrayList<>(); //? redundant?
+  private GameBoard playerBoard = new GameBoard();
   private int numPlayers;
 
   // --- Start of Boilerplate ---
@@ -150,54 +154,98 @@ public class Client {
         system_print("Console cleared");
         return true;
       case "/joingame":
+        if (parts.length != 2) {
+          system_error("Invalid join game command");
+          return true;
+        }
         sendGameEvent(PayloadType.GAME_START, parts[1]);
         return true;
+      case "/ships":
+        printShips();
+        return true;
+      case "/board":
+        drawBoard(playerBoard);
+        return true;
       case "/place":
-        placeShips(parts); // TODO: fix after refactoring
+        placeShips(parts);
+        return true;
       case "/attack":
         if (parts.length != 4) {
           system_error("Invalid attack command");
         } else {
           attackPlayer(parts[1].substring(1), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
         } 
+        return true;
     }
     return false;
 }
 
   // --- Start of Game Logic ---
 
+  private void printShips() {
+    if (ships.isEmpty()) {
+      system_print("All ships placed");
+    } else {
+      system_print("You have ships left to place: ");
+      for (Ship ship : ships) {
+        system_print("  - " + ship.getType().getName() + " : " + ship.getType().getLength());
+      }
+    }
+  }
+
   private void placeShips(String[] parts) { //place [ship] [row] [column] [direction]
+    boolean validType = false;
+    boolean hasShip = false;
     if (parts.length != 5) {
       system_error("Invalid ship placement");
       return;
     }
+    for (ShipType type : ShipType.values()) if (type.getName().equalsIgnoreCase(parts[1])) validType = true;
+    if (!validType) {
+      system_error("Unrecognized ship type");
+      return;
+    }
+    for (Ship ship : ships) if (ship.getType().getName().equalsIgnoreCase(parts[1])) hasShip = true;
+    if (!hasShip) {
+      system_error("You have already placed all of that ship available to you");
+      return;
+    }
     for (Ship ship : ships) {
       if (ship.getType().getName().equalsIgnoreCase(parts[1])) {
-        ship.setAnchorY(Integer.valueOf(parts[2]));
-        ship.setAnchorX(Integer.valueOf(parts[3]));
+        int x = Integer.parseInt(parts[3]) - 1;
+        int y = Integer.parseInt(parts[2]) - 1;
+        ship.setAnchorY(y);
+        ship.setAnchorX(x);
         ship.setOrientation(parts[4].toLowerCase());
-        sendGameEvent(PayloadType.GAME_PLACE, ship);
-        system_print("Placed " + ship.getType().getName() + " at " + parts[2] + ", " + parts[3] + " facing " + parts[4]);
+        if (!playerBoard.placeShip(ship)) {
+          system_error("Invalid ship placement");
+          return;
+        }
+        placedShips.add(ship);
+        system_print("Placed " + ship.getType().getName() + " at " + y + ", " + x + " facing " + parts[4]);
+        ships.remove(ship);
+        drawBoard(playerBoard);
         break;
-      } else {
-        system_error("You don't have that ship left to place");
-        return;
       }
     }
     if (!ships.isEmpty()) {
       system_print("You have ships left to place: ");
       for (Ship ship : ships) {
-        system_print("  - " + ship.getType().getName() + " : " + ship.getType().getLength());
+        system_print("  - " + ship.getType().getName() + " - length: " + ship.getType().getLength());
       }
     } else {
       system_print("All ships placed");
+      sendGameEvent(PayloadType.GAME_PLACE, placedShips); //? Needs to be confirmed
     }
   }
 
   private void drawBoard(GameBoard board) {
-    final char EMPTY_SPACE = ' ';
+    final char EMPTY_SPACE = ' '; 
+    int index = 1;
+    System.out.println("   1  2  3  4  5  6  7  8  9  10");
     for (PieceType[] row : board.getBoard()) {
-      System.out.print(' ');
+      System.out.print(index % 10 != 0 ? (" " + index) : index);
+      index++;
       for (PieceType piece : row) {
         game_print("[");
         switch (piece) {
@@ -216,7 +264,6 @@ public class Client {
     System.out.print(ANSI_RESET + UNIX_CLEAR);
     for (GameBoard board : opponentBoards) {
       drawBoard(board);
-      System.out.print(' ');
       for (int i = 0; i < 30; i++) game_print("-");
       System.out.println();
     }
@@ -348,7 +395,10 @@ public class Client {
       case GAME_PLACE -> {
         system_print(p.getMessage());
         ships = p.getShipList();
-        drawBoard(p.getPlayerBoard());
+        playerBoard = p.getPlayerBoard();
+        drawBoard(playerBoard);
+        printShips();
+
       }
       case GAME_START -> {
         system_print("Game started with " + p.getNumber() + " players");

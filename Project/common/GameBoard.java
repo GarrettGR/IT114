@@ -61,31 +61,28 @@ public class GameBoard implements Serializable{
     for (int i = 0; i < length; i++) {
       switch (orientation) {
         case "right" -> {
-          if (anchorX + i >= BOARD_SIZE) return false;
-          if (this.board[anchorX + i][anchorY] == PieceType.SHIP) return false;
-          this.board[anchorX + i][anchorY] = PieceType.SHIP;
-          return true;
-          }
-        case "down" -> {
-          if (anchorY - i < 0) return false;
-          if (this.board[anchorX][anchorY - i] == PieceType.SHIP) return false;
-          this.board[anchorX][anchorY - i] = PieceType.SHIP;
-          return true;
-        }
-        case "left" -> {
-          if (anchorX - i < 0) return false;
-          if (this.board[anchorX - i][anchorY] == PieceType.SHIP) return false;
-          this.board[anchorX - i][anchorY] = PieceType.SHIP;
-          return true;
-        }
-        case "up" -> {
           if (anchorY + i >= BOARD_SIZE) return false;
           if (this.board[anchorX][anchorY + i] == PieceType.SHIP) return false;
           this.board[anchorX][anchorY + i] = PieceType.SHIP;
-          return true;
         }
+        case "down" -> {
+          if (anchorX + i >= BOARD_SIZE) return false;
+          if (this.board[anchorX + i][anchorY] == PieceType.SHIP) return false;
+          this.board[anchorX + i][anchorY] = PieceType.SHIP;
+        }
+        case "left" -> {
+          if (anchorY - i < 0) return false;
+          if (this.board[anchorX][anchorY - i] == PieceType.SHIP) return false;
+          this.board[anchorX][anchorY - i] = PieceType.SHIP;
+        }
+        case "up" -> {
+          if (anchorX - i < 0) return false;
+          if (this.board[anchorX - i][anchorY] == PieceType.SHIP) return false;
+          this.board[anchorX - i][anchorY] = PieceType.SHIP;
+        }
+        default -> { return false; }
       }
     }
-    return false;
+    return true;
   }
 }

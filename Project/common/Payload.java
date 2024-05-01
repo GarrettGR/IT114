@@ -47,6 +47,8 @@ public class Payload implements Serializable {
 
   public GameBoard[] getOpponentBoards() { return opponentBoards.toArray(GameBoard[]::new); }
 
+  public List<GameBoard> getOpponentBoardsList() { return opponentBoards; }
+
   public GameBoard getOpponentBoard(int index) { return opponentBoards.get(index); }
 
   public void addShip(Ship ship) { this.ships.add(ship); }
@@ -78,6 +80,6 @@ public class Payload implements Serializable {
 
     @Override
     public String toString() {
-      return String.format("Type[%s], Number[%s], Message[%s], Name[%s]\nPlayerBoard[%s], OpBoard[%s], ships[%s], Coords[%s]", getPayloadType().toString(), getNumber(), getMessage(), getClientName(), getPlayerBoard() != null ? "true" : "false", getOpponentBoards() != null ? "true" : "false", getShips() != null ? "true" : "false", getCoordinates() != null ? "true" : "false");
+      return String.format("Type[%s], Number[%s], Message[%s], Name[%s]\nPlayerBoard[%s], OpBoard[%s], ships[%s], Coords[%s]", getPayloadType().toString(), getNumber(), getMessage(), getClientName(), getPlayerBoard() != null ? "true" : "false", getOpponentBoards() != null && !getOpponentBoardsList().isEmpty() ? "true" : "false", getShips() != null && !getShipList().isEmpty() ? "true" : "false", getCoordinates() != null && !getCoordinates().isEmpty() ? "true" : "false");
     }
 }
