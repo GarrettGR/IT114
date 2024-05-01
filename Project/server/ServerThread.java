@@ -1,11 +1,10 @@
 package Project.server;
 
+import Project.common.*;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-
-import Project.common.*;
 
 public class ServerThread extends Thread {
   private Socket client;
@@ -15,7 +14,7 @@ public class ServerThread extends Thread {
   private Room currentRoom;
 
   private void info(String message) {
-    System.out.println(String.format("Thread[%s]: %s", this.clientName, message));
+    System.out.println(String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message));
   }
 
   public ServerThread(Socket myClient, Room room) {
@@ -28,7 +27,7 @@ public class ServerThread extends Thread {
     if (name == null || name.isBlank() || currentRoom.isTakenName(name) || name.equalsIgnoreCase("Server")
         || name.equalsIgnoreCase("null") || name.equalsIgnoreCase("Lobby")) {
       System.err.println("Invalid client name being set");
-      sendMessage("Server", "Invalid name chosen, auto-generating naae");
+      sendMessage("Server", "Invalid name chosen, auto-generating name");
       name = createClientName();
     }
 
@@ -66,7 +65,7 @@ public class ServerThread extends Thread {
   }
 
   public void sendGameEvent(Payload p) {
-    switch(p.getPayloadType()) {
+    switch (p.getPayloadType()) {
       case GAME_START:
       case GAME_STATE:
         send(p);
@@ -123,7 +122,7 @@ public class ServerThread extends Thread {
       isRunning = true;
       Payload fromClient;
       while (isRunning && (fromClient = (Payload) in.readObject()) != null) {
-        info("Received from client: " + fromClient);
+        info("Received: " + fromClient);
         processMessage(fromClient);
       }
     } catch (Exception e) {
@@ -151,7 +150,6 @@ public class ServerThread extends Thread {
         if (currentRoom != null) {
           currentRoom.sendMessage(this, p.getMessage());
         } else {
-          // TODO migrate to lobby
           Room.joinRoom("lobby", this);
         }
         break;

@@ -14,6 +14,8 @@ import java.util.Scanner;
 
 public class Client {
 
+  // --- Start of variables ---
+
   Socket server = null;
   ObjectOutputStream out = null;
   ObjectInputStream in = null;
@@ -56,8 +58,7 @@ public class Client {
       /spectate - Stop playing and watch the game instead
       /clear - Clear the console
       /quit - Exit the program
-      /help - Show this help message
-      """;
+      /help - Show this help message""";
 
   final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
   final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
@@ -70,28 +71,27 @@ public class Client {
   private List<int[]> position = new ArrayList<>();
   private List<String> directions = new ArrayList<>();
 
+  // --- Start of Boilerplate ---
+
   public Client() { system_print("Client Created"); }
+
+  public void start() throws IOException { listenForKeyboard(); }
+
+  public static void main(String[] args) {
+    Client client = new Client();
+    try {
+      client.start();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  // --- Start of Checkers ---
 
   public boolean isConnected() {
     if (server == null)
       return false;
     return server.isConnected() && !server.isClosed() && !server.isInputShutdown() && !server.isOutputShutdown();
-  }
-
-  private boolean connect(String address, int port) {
-    try {
-      server = new Socket(address, port);
-      out = new ObjectOutputStream(server.getOutputStream());
-      in = new ObjectInputStream(server.getInputStream());
-      system_print("Client connected");
-      listenForServerMessage();
-      sendConnect();
-    } catch (UnknownHostException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return isConnected();
   }
 
   private boolean isConnection(String text) { return text.matches(ipAddressPattern) || text.matches(localhostPattern); }
@@ -121,6 +121,8 @@ public class Client {
       };
   }
 
+  // --- Start of Formatters ---
+
   public static void server_print(String message) {
     if (message.startsWith("Server:")) {
       System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
@@ -135,7 +137,10 @@ public class Client {
 
   public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
 
+  // --- Start of Client Input handling ---
+
   private boolean processCommand(String text) {
+    text = text.toLowerCase();
     if (isConnection(text)) {
       if (clientName.isBlank()) system_print("You can set your name by using: /name your_name");
       String[] parts = text.trim().replaceAll(" +", " ").split(" ")[1].split(":");
@@ -156,7 +161,7 @@ public class Client {
       system_print("Console cleared");
       return true;
     } else if (text.startsWith("/joingame")) {
-        sendGameEvent(PayloadType.GAME_START, text.trim().split(" ")[1]);
+      sendGameEvent(PayloadType.GAME_START, text.trim().split(" ")[1]);
         // TODO: Have the room recieve the GAMESTART and get the thread with the proper GameID and add the player to the game -- have the game thread wait 30 seconds before starting to let players join
     } else if (isGameEvent(text)) {
       String[] parts = text.trim().replaceAll(" +", " ").split(" ");
@@ -166,7 +171,7 @@ public class Client {
       } else if (parts[0].equalsIgnoreCase("/attack")) {
         sendGameEvent(PayloadType.GAME_TURN, parts[1], parts[2], parts[3]);
       } else if (parts[0].equalsIgnoreCase("/spectate")) {
-
+        // handle spectate command
       } else {
         system_error("Invalid game event");
       }
@@ -175,20 +180,7 @@ public class Client {
     return false;
   }
 
-  private void sendConnect() throws IOException {
-    Payload p = new Payload();
-    p.setPayloadType(PayloadType.CONNECT);
-    p.setClientName(clientName);
-    out.writeObject(p);
-  }
-
-  private void sendMessage(String message) throws IOException {
-    Payload p = new Payload();
-    p.setPayloadType(PayloadType.MESSAGE);
-    p.setMessage(message);
-    p.setClientName(clientName);
-    out.writeObject(p);
-  }
+  // --- Start of Game Logic ---
 
   private void placeShips(String[] parts){
     system_print("Place your ships");
@@ -215,138 +207,6 @@ public class Client {
   private void removeShip(String ship) {
     ships.get(ship)[1]--;
     if (ships.get(ship)[1] == 0) ships.remove(ship);
-  }
-
-  private void sendGameEvent(PayloadType type, Object ... data){
-    Payload p = new Payload();
-    p.setPayloadType(type);
-    p.setClientName(clientName);
-    if (null == type) {
-      system_error("Invalid game event");
-      return;
-    } else switch (type) {
-      case GAME_START -> {
-        p.setNumber((long) data[0]);
-      }
-      case GAME_PLACE -> {
-        p.setPosition(String.valueOf(clientName), position.toArray(int[][]::new));
-        p.setOtherData(directions.toArray());
-      }
-      case GAME_TURN -> {
-        //handle multiple attacks (one for each player) & salvo gameMode
-        int[][] position = {{Integer.parseInt((String) data[1]), Integer.parseInt((String) data[2])}};
-        p.setPosition(String.valueOf(data[0]), position);
-      }
-      default -> {
-        system_error("Invalid game event");
-        return;
-      }
-    }
-    sendPayload(p);
-  }
-
-  private void sendPayload(Payload p) { 
-    try {
-      out.writeObject(p);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-   }
-
-  private void listenForKeyboard() {
-    inputThread = new Thread() {
-      @Override
-      public void run() {
-        system_print("Enter /help to see a list of commands");
-        try (Scanner si = new Scanner(System.in);) {
-          String line = "";
-          isRunning = true;
-          while (isRunning) {
-            try {
-              line = si.nextLine();
-              if (!processCommand(line)) {
-                if (isConnected()) {
-                  if (line != null && line.trim().length() > 0) sendMessage(line);
-                } else {
-                  system_error("Not connected to server");
-                }
-              }
-            } catch (Exception e) {
-              system_error("Connection dropped");
-              break;
-            }
-          }
-          system_error("Exited loop");
-        } catch (Exception e) {
-          e.printStackTrace();
-        } finally {
-          close();
-        }
-      }
-    };
-    inputThread.start();
-  }
-
-  private void listenForServerMessage() {
-    fromServerThread = new Thread() {
-      @Override
-      public void run() {
-        try {
-          Payload fromServer;
-
-          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null)
-          processMessage(fromServer);
-          system_error("Loop exited");
-        } catch (Exception e) {
-          e.printStackTrace();
-          if (!server.isClosed()) {
-            system_error("Server closed connection");
-          } else {
-            system_error("Connection closed");
-          }
-        } finally {
-          close();
-          system_print("Stopped listening to server input");
-        }
-      }
-    };
-    fromServerThread.start();
-  }
-
-  private void processMessage(Payload p) {
-    switch (p.getPayloadType()) {
-      case CONNECT:
-      case DISCONNECT:
-        system_print(String.format("*%s %s*",
-            p.getClientName(),
-            p.getMessage()));
-        break;
-      case MESSAGE:
-        server_print(String.format("%s: %s",
-            p.getClientName(),
-            p.getMessage()));
-        break;
-      case GAME_START:
-        system_print("Game starting");
-        inGame = true;
-        break;
-      case GAME_STATE:
-        drawGame(p.getPlayerBoard(), p.getOpponentBoards());
-        break;
-      case GAME_PLACE:
-        Object[] data = p.getOtherData();
-        for (int i = 0; i < data.length; i += 2) {
-          String key = (String) data[i];
-          Integer[] value = (Integer[]) data[i + 1];
-          ships.put(key, value);
-        }
-        system_print(p.getMessage());
-        drawBoard(p.getPlayerBoard());
-        break;
-      case PING:
-      default:
-        break;
-    }
   }
 
   private void drawBoard(PieceType[][] board) {
@@ -390,7 +250,172 @@ public class Client {
     drawBoard(playerBoard);
   }
 
-  public void start() throws IOException { listenForKeyboard(); }
+  private void sendGameEvent(PayloadType type, Object ... data){
+    Payload p = new Payload();
+    p.setPayloadType(type);
+    p.setClientName(clientName);
+    if (null == type) {
+      system_error("Invalid game event");
+      return;
+    } else switch (type) {
+      case GAME_START -> {
+        p.setMessage("Joining Game"); 
+        p.setNumber(Long.parseLong((String) data[0]));
+      }
+      case GAME_PLACE -> {
+        p.setPosition(clientName, position.toArray(int[][]::new));
+        p.setOtherData(directions.toArray());
+      }
+      case GAME_TURN -> {
+        //handle multiple attacks (one for each player) & salvo gameMode
+        int[][] position = {{Integer.parseInt((String) data[1]), Integer.parseInt((String) data[2])}};
+        p.setPosition(String.valueOf(data[0]), position);
+      }
+      default -> {
+        system_error("Invalid game event");
+        return;
+      }
+    }
+    sendPayload(p);
+  }
+
+  // --- Start of Message Processing & Communications ---
+
+  private void sendConnect() throws IOException {
+    Payload p = new Payload();
+    p.setPayloadType(PayloadType.CONNECT);
+    p.setClientName(clientName);
+    out.writeObject(p);
+  }
+
+  private void sendMessage(String message) throws IOException {
+    Payload p = new Payload();
+    p.setPayloadType(PayloadType.MESSAGE);
+    p.setMessage(message);
+    p.setClientName(clientName);
+    out.writeObject(p);
+  }
+
+  private void sendPayload(Payload p) { 
+    try {
+      out.writeObject(p);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void listenForKeyboard() {
+    inputThread = new Thread() {
+      @Override
+      public void run() {
+        system_print("Enter /help to see a list of commands");
+        try (Scanner si = new Scanner(System.in);) {
+          String line = "";
+          isRunning = true;
+          while (isRunning) {
+            try {
+              line = si.nextLine();
+              if (!processCommand(line)) {
+                if (isConnected()) {
+                  if (line != null && line.trim().length() > 0) sendMessage(line);
+                } else {
+                  system_error("Not connected to server");
+                }
+              }
+            } catch (Exception e) {
+              system_error("Connection dropped");
+              break;
+            }
+          }
+          system_error("Exited loop");
+        } catch (Exception e) {
+          e.printStackTrace();
+        } finally {
+          close();
+        }
+      }
+    };
+    inputThread.start();
+  }
+
+  private void listenForServerMessage() {
+    fromServerThread = new Thread() {
+      @Override
+      public void run() {
+        try {
+          Payload fromServer;
+
+          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processMessage(fromServer);
+          system_error("Loop exited");
+        } catch (Exception e) {
+          e.printStackTrace();
+          if (!server.isClosed()) {
+            system_error("Server closed connection");
+          } else {
+            system_error("Connection closed");
+          }
+        } finally {
+          close();
+          system_print("Stopped listening to server input");
+        }
+      }
+    };
+    fromServerThread.start();
+  }
+
+  private void processMessage(Payload p) {
+    switch (p.getPayloadType()) {
+      case CONNECT:
+      case DISCONNECT:
+        system_print(String.format("*%s %s*",
+            p.getClientName(),
+            p.getMessage()));
+        break;
+      case MESSAGE:
+        server_print(String.format("%s: %s",
+            p.getClientName(),
+            p.getMessage()));
+        break;
+      case GAME_START: // Have this with GAME_PLACE instead?
+        system_print("Game starting");
+        inGame = true;
+        break;
+      case GAME_STATE: // Move this into GAME_START instead?
+        drawGame(p.getPlayerBoard(), p.getOpponentBoards());
+        break;
+      case GAME_PLACE:
+        Object[] data = p.getOtherData();
+        for (int i = 0; i < data.length; i += 2) {
+          String key = (String) data[i];
+          Integer[] value = (Integer[]) data[i + 1];
+          ships.put(key, value);
+        }
+        system_print(p.getMessage());
+        drawBoard(p.getPlayerBoard());
+        break;
+      case PING:
+      default:
+        break;
+    }
+  }
+
+  // --- Start of Connection handling ---
+
+  private boolean connect(String address, int port) {
+    try {
+      server = new Socket(address, port);
+      out = new ObjectOutputStream(server.getOutputStream());
+      in = new ObjectInputStream(server.getInputStream());
+      system_print("Client connected");
+      listenForServerMessage();
+      sendConnect();
+    } catch (UnknownHostException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return isConnected();
+  }
 
   private void close() {
     try {
@@ -431,14 +456,4 @@ public class Client {
       system_print("Server was never opened so this exception is ok");
     }
   }
-
-  public static void main(String[] args) {
-    Client client = new Client();
-    try {
-      client.start();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
-
 }

@@ -1,10 +1,9 @@
 package Project.server;
 
+import Project.common.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import Project.common.*;
 
 public class Room implements AutoCloseable {
   protected static Server server;
@@ -23,7 +22,7 @@ public class Room implements AutoCloseable {
   private final static String USERS = "users";
   private final static String RENAME = "rename";
   private final static String PM = "pm";
-  private final static String GAME_START = "play";
+  private final static String GAME_PLAY = "play";
   private final static String GAME_LIST = "games";
 
   public Room(String name) {
@@ -167,7 +166,7 @@ public class Room implements AutoCloseable {
             }
             client.sendMessage("Server", gameList.toString());
             break;
-          case GAME_START:
+          case GAME_PLAY:
             info("Starting game.");
             boolean hardDifficulty = false;
             boolean salvoGameMode = false;
@@ -199,6 +198,7 @@ public class Room implements AutoCloseable {
                   newGame.addPlayer(clnt);
                 }
               }
+            newGame.start(); // wait for 30 seconds to start the game? (TimedEvent)
             games.add(newGame);
             break;
           case DISCONNECT:
