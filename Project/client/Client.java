@@ -427,9 +427,6 @@ public class Client {
         drawBoard(playerBoard);
         printShips();
       }
-      case GAME_START -> {
-        /* handle something ?? */
-      }
       case GAME_STATE -> { 
         if (p.isGameOver()) inGame = false; // TODO: do more with this later
         isTurn = p.isTurn();

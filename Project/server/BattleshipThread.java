@@ -4,6 +4,7 @@ import Project.common.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -23,6 +24,7 @@ public class BattleshipThread extends Thread {
   private volatile ServerThread currentPlayer;
 
   private List<ServerThread> players = new ArrayList<>();
+  private Iterator<ServerThread> playerIterator;
   private List<ServerThread> spectators = new ArrayList<>();
 
   // private Map<ShipType, Integer> shipCounts = Map.of(
@@ -47,6 +49,7 @@ public class BattleshipThread extends Thread {
     this.hardDifficulty = hardDifficulty;
     this.salvoGameMode = salvoGameMode;
     this.room = room;
+    playerIterator = players.iterator();
     System.out.println("Battleship game thread created");
     counterTimer = new countDown(() -> { placementPhase(); }, playerCount, 180);
   }
@@ -231,6 +234,11 @@ public class BattleshipThread extends Thread {
     return true;
   }
 
+  private ServerThread getNextPlayer() {
+    if (!playerIterator.hasNext()) playerIterator = players.iterator();
+    return playerIterator.next();
+  }
+
   private void placementPhase() { // implement another latch for this? reuse the same latch?
     System.out.println("Begin placmemnt phase");
     phase = "placement";
@@ -261,7 +269,8 @@ public class BattleshipThread extends Thread {
     System.out.println("The player order is: ");
     for (ServerThread player : players) System.out.println("  - " + player.getClientName());
 
-    currentPlayer = players.get(0);
+    playerIterator = players.iterator();
+    currentPlayer = getNextPlayer();
 
     System.out.println("The current player is: " + currentPlayer.getClientName());
 
@@ -329,17 +338,13 @@ public class BattleshipThread extends Thread {
     while (players.size() > 1) { //? should this be a while loop?
       counterTimer = new countDown(() -> { 
         System.out.println("The old current player was: " + currentPlayer.getClientName() + " and they have finished their turn");
-        int currentPlayerIndex = players.indexOf(currentPlayer);
-        currentPlayer = players.get((currentPlayerIndex + 1) % players.size());
-        sendGameMessage(currentPlayer, "It is your turn");
-        System.out.println("The new current player is: " + currentPlayer.getClientName());
+        currentPlayer = getNextPlayer();
+        sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
       }, () -> {
         System.out.println("The old current player was: " + currentPlayer.getClientName() + " and they have run out of time");
         sendGameMessage(currentPlayer, "Unfortunatley, you have run out of time, you will be skipped this turn");
-        int currentPlayerIndex = players.indexOf(currentPlayer);
-        currentPlayer = players.get((currentPlayerIndex + 1) % players.size());
-        sendGameMessage(currentPlayer, "It is your turn");
-        System.out.println("The new current player is: " + currentPlayer.getClientName());
+        currentPlayer = getNextPlayer();
+        sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
       }, 1, 90);
 
       System.out.println("\n\nWaiting for " + currentPlayer.getClientName() + " to take their turn\n\n");
@@ -352,7 +357,7 @@ public class BattleshipThread extends Thread {
   }
 }
 
-class countDown {
+class countDown { // Yes, i know best practice is for a new file, but nothing else will use it
   private final Runnable lambda1;
   private final Runnable lambda2;
   private final int timeoutSeconds;
