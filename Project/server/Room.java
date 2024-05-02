@@ -294,7 +294,7 @@ public class Room implements AutoCloseable {
           Thread.sleep(5000); // wait for 5 seconds
         } catch (InterruptedException e) {
         }
-        Iterator<ServerThread> iter = clients.iterator();
+        Iterator<ServerThread> iter = clients.iterator(); //? try-catch? clients.iterator() could be null
         while (iter.hasNext()) {
           ServerThread client = iter.next();
           if (!client.sendPing()) handleDisconnect(iter, client);

@@ -7,7 +7,9 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 public class Client {
@@ -72,7 +74,9 @@ public class Client {
   private List<Ship> placedShips = new ArrayList<>();
   private List<int[]> position = new ArrayList<>(); //? redundant?
   private GameBoard playerBoard = new GameBoard();
+  private Map<String, GameBoard> opponentBoards = new HashMap<>();
   private int numPlayers;
+  private boolean isTurn = false;
 
   // --- Start of Boilerplate ---
 
@@ -113,6 +117,38 @@ public class Client {
   public static void system_error(String message) { System.out.println(ANSI_RED + message + ANSI_RESET); }
 
   public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
+
+  private void drawBoard(GameBoard board) {
+    final char EMPTY_SPACE = ' '; 
+    int index = 1;
+    System.out.println("   1  2  3  4  5  6  7  8  9  10");
+    for (PieceType[] row : board.getBoard()) {
+      System.out.print(index % 10 != 0 ? (" " + index) : index);
+      index++;
+      for (PieceType piece : row) {
+        game_print("[");
+        switch (piece) {
+          case EMPTY -> System.out.print(EMPTY_SPACE);
+          case SHIP -> System.out.print(SQUARE);
+          case HIT -> System.out.print(ANSI_RED + SQUARE + ANSI_RESET);
+          case MISS -> game_print("X");
+        }
+        game_print("]");
+      }
+      System.out.println();
+    }
+  }
+
+  private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards) {
+    System.out.print(ANSI_RESET + UNIX_CLEAR);
+    for (GameBoard board : opponentBoards) {
+      drawBoard(board);
+      for (int i = 0; i < 30; i++) game_print("-");
+      System.out.println();
+    }
+    System.out.println("\nYour board:");
+    drawBoard(playerBoard);
+  }
 
   // --- Start of Client Input handling ---
 
@@ -160,25 +196,34 @@ public class Client {
         }
         sendGameEvent(PayloadType.GAME_START, parts[1]);
         return true;
-      case "/ships":
-        printShips();
-        return true;
-      case "/board":
-        drawBoard(playerBoard);
-        return true;
-      case "/place":
-        placeShips(parts);
-        return true;
-      case "/attack":
-        if (parts.length != 4) {
-          system_error("Invalid attack command");
-        } else {
-          attackPlayer(parts[1].substring(1), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
-        } 
-        return true;
+      case "/ships", "/board", "/place", "/attack":
+        return processGameCommands(parts);
     }
     return false;
-}
+  }
+
+  private boolean processGameCommands(String[] parts) {
+    if (!inGame) return false;
+    switch (parts[0]) {
+      case "/ships":
+      printShips();
+      return true;
+    case "/board":
+      drawBoard(playerBoard);
+      return true;
+    case "/place":
+      placeShips(parts);
+      return true;
+    case "/attack":
+      if (parts.length != 4) {
+        system_error("Invalid attack command");
+      } else {
+        attackPlayer(parts[1].substring(1), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+      } 
+      return true;
+    }
+    return false;
+  }
 
   // --- Start of Game Logic ---
 
@@ -239,47 +284,25 @@ public class Client {
     }
   }
 
-  private void drawBoard(GameBoard board) {
-    final char EMPTY_SPACE = ' '; 
-    int index = 1;
-    System.out.println("   1  2  3  4  5  6  7  8  9  10");
-    for (PieceType[] row : board.getBoard()) {
-      System.out.print(index % 10 != 0 ? (" " + index) : index);
-      index++;
-      for (PieceType piece : row) {
-        game_print("[");
-        switch (piece) {
-          case EMPTY -> System.out.print(EMPTY_SPACE);
-          case SHIP -> System.out.print(SQUARE);
-          case HIT -> System.out.print(ANSI_RED + SQUARE + ANSI_RESET);
-          case MISS -> game_print("X");
-        }
-        game_print("]");
-      }
-      System.out.println();
-    }
-  }
-
-  private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards) {
-    System.out.print(ANSI_RESET + UNIX_CLEAR);
-    for (GameBoard board : opponentBoards) {
-      drawBoard(board);
-      for (int i = 0; i < 30; i++) game_print("-");
-      System.out.println();
-    }
-    System.out.println("\nYour board:");
-    drawBoard(playerBoard);
-  }
-
   private void attackPlayer(String target, int row, int column) {
-    // TODO: be able to attack once for each opponent
-    // TODO: validate that the attack is valid
-      // - check if the target is a valid player
-      // - check if the row & column are within the board
-      // - check if it is the player's turn
-      // - check if the target is not the player
-      // - check if the target has not been attacked before (that turn)
-    
+    if (!isTurn) {
+      system_error("It is not your turn");
+      return;
+    }
+    if (row < 1 || row > 10 || column < 1 || column > 10) {
+      system_error("Invalid coordinates");
+      return;
+    }
+    if (opponentBoards.get(target) == null) {
+      system_error("Invalid target");
+      return;
+    }
+    if (opponentBoards.get(target).getPiece(row - 1, column - 1) == PieceType.HIT || opponentBoards.get(target).getPiece(row - 1, column - 1) == PieceType.MISS) {
+      system_error("You have already targeted that location");
+      return;
+    }
+    opponentBoards.remove(target);
+    sendGameEvent(PayloadType.GAME_TURN, target, row, column);
   }
 
   private void sendGameEvent(PayloadType type, Object ... data){
@@ -292,7 +315,8 @@ public class Client {
     } else switch (type) {
       case GAME_START -> p.setNumber(Long.parseLong( (String) data[0]));
       case GAME_PLACE -> {
-        for (Object datum : data) p.addShip((Ship) datum); //? can I fo p.setShips( (ship[]) data) instead -- if I pass it a list of ships (?)
+        // for (Object datum : data) p.addShip((Ship) datum);
+        p.setShips(placedShips);
       }
       case GAME_TURN -> {
         p.addCoordinate((String) data[0], new Integer[]{(int) data[1], (int) data[2]});
@@ -326,7 +350,6 @@ public class Client {
     try {
       out.writeObject(p);
     } catch (IOException e) {
-      e.printStackTrace();
     }
   }
 
@@ -393,22 +416,26 @@ public class Client {
       case CONNECT, DISCONNECT -> system_print(String.format("*%s %s*", p.getClientName(), p.getMessage()));
       case MESSAGE -> server_print(String.format("%s: %s", p.getClientName(), p.getMessage()));
       case GAME_PLACE -> {
+        system_print("Game started with " + p.getNumber() + " players");
+        numPlayers = (int) p.getNumber();
+        inGame = true;
         system_print(p.getMessage());
         ships = p.getShipList();
         playerBoard = p.getPlayerBoard();
         drawBoard(playerBoard);
         printShips();
-
       }
       case GAME_START -> {
-        system_print("Game started with " + p.getNumber() + " players");
-        numPlayers = (int) p.getNumber();
-        inGame = true;
+        /* handle something ?? */
       }
-      case GAME_STATE -> drawGame(p.getPlayerBoard(), p.getOpponentBoards());
-      case PING -> {
-        // do nothing 
+      case GAME_STATE -> { 
+        if (p.isGameOver()) inGame = false; // TODO: do more with this later
+        this.playerBoard = p.getPlayerBoard();
+        this.opponentBoards = p.getOpponentBoardsMap();
+        drawGame(p.getPlayerBoard(), p.getOpponentBoards());
+        system_print(p.getMessage());
       }
+      case PING -> { /* do nothing */ }
       default -> throw new IllegalArgumentException("Unexpected value: " + p.getPayloadType());
     }
   }

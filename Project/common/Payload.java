@@ -12,10 +12,13 @@ public class Payload implements Serializable {
   private String clientName;
   private String message;
   private long number;
+  private boolean isTurn = false;
+  private boolean isGameOver = false;
   private GameBoard playerBoard;
-  private List<GameBoard> opponentBoards = new ArrayList<>();
+  private Map<String, GameBoard> opponentBoards = new HashMap<>(); // Username, GameBoard
   private List<Ship> ships = new ArrayList<>();
-  private Map<String,  List<Integer[]>> coordinates = new HashMap<>();
+  private Map<String,  List<Integer[]>> coordinates = new HashMap<>(); // Username, coordinates
+  
 
   public PayloadType getPayloadType() { return payloadType; }
 
@@ -35,21 +38,29 @@ public class Payload implements Serializable {
 
   public void setNumber(long number) { this.number = number; }
 
+  public void setTurn(boolean isTurn) { this.isTurn = isTurn; }
+
+  public boolean isTurn() { return isTurn; }
+
+  public void setGameOver(boolean isGameOver) { this.isGameOver = isGameOver; }
+
+  public boolean isGameOver() { return isGameOver; }
+
   public void setPlayerBoard(GameBoard board) { this.playerBoard = board; }
 
   public GameBoard getPlayerBoard() { return playerBoard; }
 
-  public void addOpponentBoard(GameBoard board) { this.opponentBoards.add(board); }
+  public void addOpponentBoard(String key, GameBoard board) { this.opponentBoards.put(key, board); }
 
-  public void setOpponentBoards(List<GameBoard> boards) { this.opponentBoards = boards; }
+  public void setOpponentBoards(Map<String, GameBoard> boards) { this.opponentBoards = boards; }
 
-  public void setOpponentBoards(GameBoard[] boards) { this.opponentBoards = List.of(boards); } // rewrote to not need this... remove?
+  public Map<String, GameBoard> getOpponentBoardsMap() { return opponentBoards; }
 
-  public GameBoard[] getOpponentBoards() { return opponentBoards.toArray(GameBoard[]::new); }
+  public GameBoard[] getOpponentBoards() { return opponentBoards.values().toArray(GameBoard[]::new); }
 
-  public List<GameBoard> getOpponentBoardsList() { return opponentBoards; }
+  public List<GameBoard> getOpponentBoardsList() { return new ArrayList<>(opponentBoards.values()); }
 
-  public GameBoard getOpponentBoard(int index) { return opponentBoards.get(index); }
+  public GameBoard getOpponentBoard(String key) { return opponentBoards.get(key); }
 
   public void addShip(Ship ship) { this.ships.add(ship); }
 
@@ -78,8 +89,8 @@ public class Payload implements Serializable {
     }
   }
 
-    @Override
-    public String toString() {
-      return String.format("Type[%s], Number[%s], Message[%s], Name[%s]\nPlayerBoard[%s], OpBoard[%s], ships[%s], Coords[%s]", getPayloadType().toString(), getNumber(), getMessage(), getClientName(), getPlayerBoard() != null ? "true" : "false", getOpponentBoards() != null && !getOpponentBoardsList().isEmpty() ? "true" : "false", getShips() != null && !getShipList().isEmpty() ? "true" : "false", getCoordinates() != null && !getCoordinates().isEmpty() ? "true" : "false");
-    }
+  @Override
+  public String toString() {
+    return String.format("Type[%s], Number[%s], Message[%s], Name[%s]\nPlayerBoard[%s], OpBoard[%s], ships[%s], Coords[%s]", getPayloadType().toString(), getNumber(), getMessage(), getClientName(), getPlayerBoard() != null ? "true" : "false", getOpponentBoards() != null && !getOpponentBoardsList().isEmpty() ? "true" : "false", getShips() != null && !getShipList().isEmpty() ? "true" : "false", getCoordinates() != null && !getCoordinates().isEmpty() ? "true" : "false");
+  }
 }

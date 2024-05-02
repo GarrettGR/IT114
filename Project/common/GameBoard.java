@@ -53,36 +53,28 @@ public class GameBoard implements Serializable{
   public PieceType getPiece(int x, int y) { return board[x][y]; }
 
   public boolean placeShip(Ship ship) {
+    PieceType[][] tempBoard = new PieceType[BOARD_SIZE][BOARD_SIZE];
+    for (int i = 0; i < BOARD_SIZE; i++) System.arraycopy(this.board[i], 0, tempBoard[i], 0, BOARD_SIZE);
+
     int anchorX = ship.getAnchorX();
     int anchorY = ship.getAnchorY();
-    if (anchorX < 0 || anchorX >= BOARD_SIZE || anchorY < 0 || anchorY >= BOARD_SIZE) return false;
     String orientation = ship.getOrientation().toLowerCase();
     int length = ship.getType().getLength();
+
     for (int i = 0; i < length; i++) {
+      int x = anchorX;
+      int y = anchorY;
       switch (orientation) {
-        case "right" -> {
-          if (anchorY + i >= BOARD_SIZE) return false;
-          if (this.board[anchorX][anchorY + i] == PieceType.SHIP) return false;
-          this.board[anchorX][anchorY + i] = PieceType.SHIP;
-        }
-        case "down" -> {
-          if (anchorX + i >= BOARD_SIZE) return false;
-          if (this.board[anchorX + i][anchorY] == PieceType.SHIP) return false;
-          this.board[anchorX + i][anchorY] = PieceType.SHIP;
-        }
-        case "left" -> {
-          if (anchorY - i < 0) return false;
-          if (this.board[anchorX][anchorY - i] == PieceType.SHIP) return false;
-          this.board[anchorX][anchorY - i] = PieceType.SHIP;
-        }
-        case "up" -> {
-          if (anchorX - i < 0) return false;
-          if (this.board[anchorX - i][anchorY] == PieceType.SHIP) return false;
-          this.board[anchorX - i][anchorY] = PieceType.SHIP;
-        }
+        case "right" -> y += i;
+        case "down" -> x += i;
+        case "left" -> y -= i;
+        case "up" -> x -= i;
         default -> { return false; }
       }
+      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE || tempBoard[x][y] == PieceType.SHIP) return false;
+      tempBoard[x][y] = PieceType.SHIP;
     }
+    this.board = tempBoard; // if all placements are valid, update the board
     return true;
   }
 }
