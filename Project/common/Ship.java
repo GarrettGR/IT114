@@ -54,4 +54,9 @@ public class Ship implements Serializable{
 
   // public int getFuselage(int index) { return fuselage[index]; }
 
+  @Override
+  public String toString() {
+    return String.format("%s at (%d, %d) %s", type.getName(), anchorX, anchorY, orientation);
+  }
+
 }

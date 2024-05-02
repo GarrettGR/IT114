@@ -77,4 +77,20 @@ public class GameBoard implements Serializable{
     this.board = tempBoard; // if all placements are valid, update the board
     return true;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("   1  2  3  4  5  6  7  8  9  10").append('\n');
+    int index = 1;
+    for (PieceType[] row : board) {
+      sb.append(index % 10 != 0 ? (" " + index) : index);
+      index++;
+      for (PieceType piece : row) {
+        sb.append('[').append(piece.toString()).append(']');
+      }
+      sb.append('\n');
+    }
+    return sb.toString();
+  }
 }

@@ -15,6 +15,8 @@ public class ServerThread extends Thread {
   private GameBoard gameBoard = new GameBoard();
   private boolean isAway = false;
   private boolean isReady = false;
+  private boolean isTurn = false;
+  private boolean isSpectator = false;
   
 
   private void info(String message) { System.out.println(String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message)); }
@@ -54,6 +56,14 @@ public class ServerThread extends Thread {
   protected boolean isReady() { return isReady; }
 
   protected void setReady(boolean ready) { isReady = ready; }
+
+  protected boolean isTurn() { return isTurn; }
+
+  protected void setTurn(boolean turn) { isTurn = turn; }
+
+  protected boolean isSpectator() { return isSpectator; }
+
+  protected void setSpectator(boolean spectator) { isSpectator = spectator; }
 
   public void disconnect() {
     info("Thread being disconnected by server");
@@ -143,6 +153,7 @@ public class ServerThread extends Thread {
         if (currentRoom != null) currentRoom.pushGamePayload(this, p);
       }
       case MESSAGE -> {
+        if (isSpectator) return;
         if (currentRoom != null) currentRoom.sendMessage(this, p.getMessage());
         else  Room.joinRoom("lobby", this);
       }

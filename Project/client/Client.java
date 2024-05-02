@@ -28,6 +28,9 @@ public class Client {
   public static final String UNIX_CLEAR = "\033[H\033[2J";
   public static final String SQUARE = "\u25A0";
 
+  final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
+  final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
+
   private static final String HELP = """
       /connect [ip address]:[port] - Connect to a server
       /connect localhost:[port] - Connect to a server on localhost
@@ -63,10 +66,11 @@ public class Client {
       /help - Show this help message
       """;
 
-  final String ipAddressPattern = "/connect\\s+(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}:\\d{3,5})";
-  final String localhostPattern = "/connect\\s+(localhost:\\d{3,5})";
+
   boolean isRunning = false;
   private boolean inGame = false;
+  private boolean isTurn = false;
+  private int numPlayers;
   private Thread inputThread;
   private Thread fromServerThread;
   private String clientName = "";
@@ -75,8 +79,6 @@ public class Client {
   private List<int[]> position = new ArrayList<>(); //? redundant?
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>();
-  private int numPlayers;
-  private boolean isTurn = false;
 
   // --- Start of Boilerplate ---
 
@@ -430,6 +432,7 @@ public class Client {
       }
       case GAME_STATE -> { 
         if (p.isGameOver()) inGame = false; // TODO: do more with this later
+        isTurn = p.isTurn();
         this.playerBoard = p.getPlayerBoard();
         this.opponentBoards = p.getOpponentBoardsMap();
         drawGame(p.getPlayerBoard(), p.getOpponentBoards());
@@ -496,5 +499,8 @@ public class Client {
     } catch (NullPointerException ne) {
       system_print("Server was never opened so this exception is ok");
     }
+    inGame = false;
+    isTurn = false;
+
   }
 }
