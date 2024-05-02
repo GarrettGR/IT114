@@ -304,6 +304,15 @@ public class Room implements AutoCloseable {
   }
 
   private void handleDisconnect(Iterator<ServerThread> iter, ServerThread client) {
+    for (BattleshipThread game : games) {
+      if (game.hasPlayer(client)) {
+        game.removePlayer(client);
+        if (game.getPlayers().isEmpty()) {
+          games.remove(game);
+          game.close();
+        }
+      }
+    }
     iter.remove();
     info("Removed client " + client.getClientName());
     checkClients();

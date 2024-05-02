@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CountDownLatch; //? Use a semaphore instead?
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -37,48 +37,52 @@ public class BattleshipThread extends Thread {
   //   );
 
   private Map<ShipType, Integer> shipCounts = Map.of( // testing with fewer ships to save time
-    ShipType.CARRIER, 1,
+    ShipType.CARRIER, 0,
     ShipType.BATTLESHIP, 1,
-    ShipType.CRUISER, 1,
+    ShipType.CRUISER, 0,
     ShipType.SUBMARINE, 1,
     ShipType.DESTROYER, 0,
     ShipType.LIFE_BOAT, 0
   );
+
+  protected static final String ANSI_RESET = "\u001B[0m";
+  protected static final String ANSI_YELLOW = "\u001B[33m";
+  protected static final String ANSI_RED = "\u001B[31m";
+  protected static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
+  protected static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
 
   public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode, int playerCount) {
     this.hardDifficulty = hardDifficulty;
     this.salvoGameMode = salvoGameMode;
     this.room = room;
     playerIterator = players.iterator();
-    System.out.println("Battleship game thread created");
+    printGameInfo("Battleship game thread created\n");
     counterTimer = new countDown(() -> { placementPhase(); }, playerCount, 180);
   }
+
+  protected static void printGameInfo(String message) { System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET); }
 
   public void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
     Payload payload = new Payload();
     payload.setPayloadType(type);
     payload.setClientName(player.getClientName());
     payload.setMessage(message);
-    for (ServerThread opponent : players) { 
-      if (opponent == player) continue;
-      if (currentPlayer != null && opponent == currentPlayer) payload.setTurn(true); //? is this adequate?
-      else payload.setTurn(false); //? false by default -- could be removed
-      payload.setPlayerBoard(opponent.getGameBoard());
-      for (ServerThread other : players) {
-        if (other == opponent) continue;
-        payload.addOpponentBoard(other.getClientName(), other.getGameBoard().getProtectedCopy());
-      }
-      opponent.sendGameEvent(payload);
+    payload.setNumber((long) (players.size() - 1));
+    for (ServerThread p : players) { 
+      if (p == null) continue;
+      if (p == currentPlayer) payload.setTurn(true);
+      if (p == player) continue;
+      payload.setPlayerBoard(p.getGameBoard());
+      payload.setOpponentBoards(getOpponentBoards(p));
+      p.sendGameEvent(payload);
     }
-    if (player == currentPlayer) payload.setTurn(true); //? this is a little redundant, but cant hurt
-    else payload.setTurn(false);
     payload.setMessage(privledgedMessage);
     payload.setOpponentBoards(getOpponentBoards(player));
     payload.setPlayerBoard(player.getGameBoard());
     player.sendGameEvent(payload);
 
-    for (ServerThread p : players) if (player != p) payload.addOpponentBoard(p.getClientName(), p.getGameBoard()); // let spectators see all boards
-    for (ServerThread spec : spectators) spec.sendGameEvent(payload);
+    for (ServerThread p : players) if (p != null) if (player != p) payload.addOpponentBoard(p.getClientName(), p.getGameBoard()); // let spectators see all board information
+    for (ServerThread spec : spectators) if (spec != null) spec.sendGameEvent(payload);
   }
 
   public void sendGameMessage(ServerThread player, String message) {
@@ -95,47 +99,45 @@ public class BattleshipThread extends Thread {
     switch (payload.getPayloadType()) {
       case GAME_START ->  addPlayer(player);
       case GAME_PLACE -> {
-        if (started || hasPlacedShips(player)) return;
-        System.out.println("Placing ships");
+        if (started || player.getGameBoard().hasShips()) return;
+        printGameInfo("Placing ships");
         List<Ship> ships = payload.getShipList();
-        // TODO: Determine the cause of these failing validation checks
-        // if (!validateShipCounts(ships)) { 
-        //   System.err.println("Invalid ship counts");
-        //   sendGameMessage(player, "You cannot place any more ships");
-        //   return;
-        // }
-        // if (!validateShipPlacements(ships, player.getGameBoard())) {
-        //   System.out.println("Invalid ship placement");
-        //   sendGameMessage(player, "Invalid ship placement");
-        //   return;
-        // }
 
-        System.out.println("\n\n Ships: ");
-        for (Ship ship : ships) System.out.println("  - " + ship);
-        System.out.println('\n');
+        if (!validateShipCounts(ships)) { 
+          System.err.println("\nInvalid ship counts");
+          sendGameMessage(player, "You cannot place any more ships");
+          return;
+        }
+        if (!validateShipPlacements(ships, player.getGameBoard())) {
+          System.out.println("\nInvalid ship placement");
+          sendGameMessage(player, "Invalid ship placement");
+          return;
+        }
+
+        printGameInfo("Ships: ");
+        for (Ship ship : ships) printGameInfo("  - " + ship);
+        System.out.println();
 
         GameBoard board = player.getGameBoard() != null ? new GameBoard(player.getGameBoard()) : new GameBoard();
         for (Ship ship : ships) board.placeShip(ship);
 
-        System.out.println("\n Board: ");
-        System.out.println(board);
-        System.out.println("\n\n");
+        printGameInfo(" Board: ");
+        printGameInfo(board.toString());
 
         player.setGameBoard(board);
-        System.out.println("Ships placed successfully for " + player.getClientName()); 
+        printGameInfo("Ships placed successfully for " + player.getClientName()); 
         sendGameMessage(player, "You have placed your ships, waiting for other players");
-        counterTimer.decrement(); // TODO: check if I should create a whole new latch for this
+        counterTimer.decrement();
       }
       case GAME_TURN -> {
-        System.out.println("Taking turn");
-        if (!started || !hasPlacedShips(player)) return; // make them a spectator -- send a message they can't do that?
+        printGameInfo("Taking turn");
+        if (!started || !player.getGameBoard().hasShips()) return; // make them a spectator -- send a message they can't do that?
         Map<String, List<Integer[]>> targetCoordinates = payload.getCoordinates();
-        System.out.println("Target coordinates: ");
+        printGameInfo("Target coordinates: ");
         for (String name : targetCoordinates.keySet()) {
-          System.out.println("  - " + name);
-          for (Integer[] coordinate : targetCoordinates.get(name)) System.out.println("    - " + coordinate[0] + ", " + coordinate[1]);
+          printGameInfo("  - " + name);
+          for (Integer[] coordinate : targetCoordinates.get(name)) printGameInfo("    - " + coordinate[0] + ", " + coordinate[1]);
         }
-        System.out.println("\n\n");
         for (String name : targetCoordinates.keySet()) {
           List<Integer[]> coordinates = targetCoordinates.get(name);
           if (coordinates.isEmpty()) {
@@ -144,6 +146,10 @@ public class BattleshipThread extends Thread {
           }
           if (!salvoGameMode && coordinates.size() > 1) {
             sendGameMessage(player, "You can only target one location in Classic mode");
+            return;
+          }
+          if (getPlayer(name) == null) {
+            sendGameMessage(player, "Invalid target");
             return;
           }
           GameBoard targetBoard = getPlayer(name).getGameBoard();
@@ -210,16 +216,7 @@ public class BattleshipThread extends Thread {
     return boards;
   }
 
-  private boolean hasPlacedShips(ServerThread player) {
-    if (player.getGameBoard() == null) return false;
-    GameBoard board = player.getGameBoard();
-    for (int i = 0; i < board.getBoardSize(); i++)
-      for (int j = 0; j < board.getBoardSize(); j++)
-        if (board.getPiece(i, j) == PieceType.SHIP) return true;
-    return false;
-  }
-
-  private boolean validateShipCounts(List<Ship> ships) { // TODO: should be implemented, but throws issues inconsistently... investigate if enough time
+  private boolean validateShipCounts(List<Ship> ships) { 
     Map<ShipType, Integer> tempShipCounts = new HashMap<>(shipCounts);
     for (Ship ship : ships) {
       if (tempShipCounts.get(ship.getType()) == 0) return false;
@@ -240,7 +237,7 @@ public class BattleshipThread extends Thread {
   }
 
   private void placementPhase() { // implement another latch for this? reuse the same latch?
-    System.out.println("Begin placmemnt phase");
+    printGameInfo("Begin placmemnt phase");
     phase = "placement";
     for (ServerThread player : players) {
       Payload p = new Payload();
@@ -254,34 +251,38 @@ public class BattleshipThread extends Thread {
           p.addShip(ship);
         }
       }
+      p.setNumber((long) players.size());
       player.sendGameEvent(p);
     }
   }
 
   private void gamePhaseInitializer() {
-    System.out.println("Begin game phase");
+    printGameInfo("Begin game phase");
     phase = "game";
     started = true;
     for (ServerThread player : players) sendGameMessage(player, "The game has started"); //? unnecessary?
 
     Collections.shuffle(players);
 
-    System.out.println("The player order is: ");
-    for (ServerThread player : players) System.out.println("  - " + player.getClientName());
+    printGameInfo("The player order is: ");
+    for (ServerThread player : players) printGameInfo("  - " + player.getClientName());
 
     playerIterator = players.iterator();
     currentPlayer = getNextPlayer();
 
-    System.out.println("The current player is: " + currentPlayer.getClientName());
+    printGameInfo("The current player is: " + currentPlayer.getClientName());
 
-    sendGameMessage(currentPlayer, "It is your turn");
+    sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
+
   }
 
   private synchronized void handleAttack(ServerThread player, Map<String, List<Integer[]>> targetCoordinates) {
     if (currentPlayer == null) currentPlayer = player;
     if (player != currentPlayer) return;
 
-    System.out.println(player.getClientName() + " is taking their turn");
+    printGameInfo(player.getClientName() + " is executing their attack (validated)");
+
+    printGameInfo(String.format("\nPlayer Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
 
     for (String name : targetCoordinates.keySet()) {
       List<Integer[]> coordinates = targetCoordinates.get(name);
@@ -289,16 +290,17 @@ public class BattleshipThread extends Thread {
       for (Integer[] coordinate : coordinates) {
         int x = coordinate[0];
         int y = coordinate[1];
-        System.out.println("Targeting " + name + " at " + x + ", " + y);
+        printGameInfo("Targeting " + name + " at " + x + ", " + y);
         if (targetBoard.getPiece(x, y) == PieceType.SHIP) {
-          System.out.println("Hit");
+          printGameInfo(String.format("%sHit%s", ANSI_RED, ANSI_RESET));
           targetBoard.setPiece(x, y, PieceType.HIT);
-          sendGameState(player, PayloadType.MESSAGE, String.format("%s hit one of %s's ships", player.getClientName(), name), String.format("You hit one of %s's ships on %s, %s", name, x, y));
+          sendGameState(player, PayloadType.MESSAGE, String.format("%s hit one of %s's ships", player.getClientName(), name), String.format("You hit one of %s's ships on %s, %s", name, x+1, y+1));
         } else {
-          System.out.println("Miss");
+          printGameInfo(String.format("%sMiss%s", ANSI_RED, ANSI_RESET));
           targetBoard.setPiece(x, y, PieceType.MISS);
-          sendGameState(player, PayloadType.MESSAGE, String.format("%s missed while targeting %s", player.getClientName(), name), String.format("Your shot at %s on %s, %s missed", name, x, y));
+          sendGameState(player, PayloadType.MESSAGE, String.format("%s missed while targeting %s", player.getClientName(), name), String.format("Your shot at %s on %s, %s missed", name, y+1, x+1));
         }
+        printGameInfo(String.format("Target Board for %s:\n%s", name, targetBoard.toString()));
       }
       counterTimer.decrement();
     }
@@ -307,47 +309,47 @@ public class BattleshipThread extends Thread {
   @Override
   public void run() {
     isRunning = true;
-    System.out.println("Battleship game thread started");
+    printGameInfo("Battleship game thread started");
     if (!hardDifficulty) hardDifficulty = false;
     if (!salvoGameMode) salvoGameMode = false;
 
-    System.out.println("Waiting for players to join");
+    printGameInfo("Waiting for players to join");
     counterTimer.runLambdas(); // just a counter that does nothing but wait for up to 4 people to join (or 3 minutes to pass)
 
-    System.out.println("All players who are going to play have joined");
-    System.out.println("Game thread running");
+    printGameInfo("All players who are going to play have joined");
+    printGameInfo("Game thread running");
 
     counterTimer = new countDown(() -> { gamePhaseInitializer(); }, () -> { 
       gamePhaseInitializer(); 
       for (ServerThread player : players) {
-        if (!hasPlacedShips(player)) {
+        if (!player.getGameBoard().hasShips()) {
           sendGameMessage(player, "You have not placed your ships");
           addSpectator(player);
           removePlayer(player);
         }
-        sendGameMessage(player, "Timeout reached, starting game phase, any players who have not placed their ships will be spectators, and any unplaced ships will be lost");
+        sendGameMessage(player, "\nTimeout reached, starting game phase, any players who have not placed their ships will be spectators, and any unplaced ships will be lost");
       }
     }, players.size(), 180);
 
-    System.out.println("Waiting for players to place ships");
+    printGameInfo("Waiting for players to place ships");
     counterTimer.runLambdas(); // waits for all players to place their ships (or 3 minutes to pass)
 
-    System.out.println("All players who are playing have placed their ships");
-    System.out.println("Game Flow: turns starting");
+    printGameInfo("All players who are playing have placed their ships");
+    printGameInfo("Game Flow: turns starting");
 
     while (players.size() > 1) { //? should this be a while loop?
       counterTimer = new countDown(() -> { 
-        System.out.println("The old current player was: " + currentPlayer.getClientName() + " and they have finished their turn");
+        printGameInfo("The old current player was: " + ANSI_RED + currentPlayer.getClientName() + ANSI_YELLOW + " and they have finished their turn");
         currentPlayer = getNextPlayer();
         sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
       }, () -> {
-        System.out.println("The old current player was: " + currentPlayer.getClientName() + " and they have run out of time");
+        printGameInfo("The old current player was: " + ANSI_RED + currentPlayer.getClientName() + ANSI_YELLOW+ " and they have run out of time");
         sendGameMessage(currentPlayer, "Unfortunatley, you have run out of time, you will be skipped this turn");
         currentPlayer = getNextPlayer();
         sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
-      }, 1, 90);
+      }, players.size() - 1, 90);
 
-      System.out.println("\n\nWaiting for " + currentPlayer.getClientName() + " to take their turn\n\n");
+      printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
       counterTimer.runLambdas();
     }
 
@@ -372,7 +374,7 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
     this.timeoutSeconds = timeoutSeconds;
     this.latch = new CountDownLatch(latchCount);
     this.executor = Executors.newScheduledThreadPool(1);
-    System.out.println("Countdown created");
+    BattleshipThread.printGameInfo("Countdown created");
   }
 
   public countDown(Runnable lambda1, int latchCount, int timeoutSeconds) {
@@ -380,11 +382,17 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
   }
 
   public void decrement() {
-    System.out.println("Countdown decremented");
+    BattleshipThread.printGameInfo("Countdown decremented");
     latch.countDown();
   }
 
   public long getTimeRemaining() { return timeRemaining; }
+
+  private void printTimer() {
+    if (timeRemaining < 10) System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_RED + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET);
+    else if (timeRemaining < 30) System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET);
+    else System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "   ");
+  }
 
   public void runLambdas() {
     if (executor != null) executor.shutdownNow();
@@ -395,13 +403,13 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
     Thread counter = new Thread(() -> {
       try {
         if (!latch.await(timeoutSeconds, TimeUnit.SECONDS)) {
-          System.out.println("Timeout occurred");
+          BattleshipThread.printGameInfo("\nTimeout occurred");
           lambda2.run();
         } else {
-          System.out.println("Countdown completed");
+          BattleshipThread.printGameInfo("Countdown completed");
           lambda1.run();
         }
-        executor.shutdown(); //? can remove the reinitialization of the executor & !null check in the run method?
+        executor.shutdownNow();
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
@@ -411,7 +419,9 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
     ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
       long elapsedTime = (System.currentTimeMillis() - startTime) / 1000;
       timeRemaining = timeoutSeconds - elapsedTime;
-      System.out.println("Time remaining: " + timeRemaining + " seconds");
+      // if ( ((int) elapsedTime) % 5 == 0) printTimer()  // to regulate how often it prints
+        printTimer();
+      // System.out.println("Time remaining: " + timeRemaining + " seconds");
     }, 0, 1, TimeUnit.SECONDS);
 
     try {

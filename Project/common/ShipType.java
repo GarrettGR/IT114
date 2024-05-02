@@ -6,7 +6,7 @@ public enum ShipType {
   CRUISER(3, "Cruiser"),
   SUBMARINE(3, "Submarine"),
   DESTROYER(2, "Destroyer"),
-  LIFE_BOAT(1, "Life Boat");
+  LIFE_BOAT(1, "Lifeboat");
 
   private final int length;
   private final String name;

@@ -12,9 +12,9 @@ public enum PieceType {
   public String toString() {
       return switch (this) {
           case EMPTY -> " ";
-          case SHIP -> SQUARE;
-          case HIT -> ANSI_RED + SQUARE + ANSI_RESET;
-          case MISS -> ANSI_YELLOW + SQUARE + ANSI_RESET;
+          case SHIP -> ANSI_RESET + SQUARE;
+          case HIT -> ANSI_RESET + ANSI_RED + SQUARE + ANSI_RESET;
+          case MISS -> ANSI_RESET + ANSI_YELLOW + SQUARE + ANSI_RESET;
           default -> " ";
       };
   }

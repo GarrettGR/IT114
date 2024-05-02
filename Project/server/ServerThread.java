@@ -19,7 +19,7 @@ public class ServerThread extends Thread {
   private boolean isSpectator = false;
   
 
-  private void info(String message) { System.out.println(String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message)); }
+  private void info(String message) { System.out.println('\n' + String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message)); }
 
   public ServerThread(Socket myClient, Room room) {
     info("Thread created");
@@ -34,6 +34,8 @@ public class ServerThread extends Thread {
       name = createClientName();
     }
     this.clientName = name;
+    this.gameBoard.setClientName(name);
+
   }
 
   protected String getClientName() { return clientName; }
@@ -45,7 +47,10 @@ public class ServerThread extends Thread {
     else info("Passed in room was null, this shouldn't happen");
   }
 
-  protected synchronized void setGameBoard(GameBoard board) { gameBoard = board; }
+  protected synchronized void setGameBoard(GameBoard board) { 
+    gameBoard = board; 
+    gameBoard.setClientName(clientName);
+  }
 
   protected GameBoard getGameBoard() { return gameBoard; }
 
