@@ -4,13 +4,12 @@ import Project.common.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Room implements AutoCloseable {
   protected static Server server;
   private final String name;
-  private List<ServerThread> clients = new CopyOnWriteArrayList<>();
-  private List<BattleshipThread> games = new CopyOnWriteArrayList<>();
+  private List<ServerThread> clients = new ArrayList<>();
+  private List<BattleshipThread> games = new ArrayList<>();
   private boolean isRunning = false;
 
   private final static String COMMAND_TRIGGER = "/";
