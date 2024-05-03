@@ -382,7 +382,8 @@ public class Client {
       public void run() {
         try {
           Payload fromServer;
-          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processMessage(fromServer);
+          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) 
+            processMessage(fromServer);
           system_error("Loop exited");
         } catch (Exception e) {
           e.printStackTrace();
@@ -432,22 +433,6 @@ public class Client {
         this.coordinates = new HashMap<>();
         this.playerBoard = p.getPlayerBoard();
         this.opponentBoards = p.getOpponentBoardsMap();
-
-        System.out.print(String.format("""
-
-
-            The payloads's gameboard is:
-            %s
-
-            The player's gameboard is:
-            %s
-
-            The first opponent's gameboard is:
-            %s
-
-            
-            """, p.getPlayerBoard().toString(), this.playerBoard.toString(), p.getOpponentBoards()[0].toString()));
-
         drawGame(p.getPlayerBoard(), p.getOpponentBoards(), p.getMessage());
       }
       case PING -> { /* do nothing */ }

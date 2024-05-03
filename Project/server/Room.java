@@ -309,7 +309,7 @@ public class Room implements AutoCloseable {
         game.removePlayer(client);
         if (game.getPlayers().isEmpty()) {
           games.remove(game);
-          game.close();
+          game.cleanup();
         }
       }
     }

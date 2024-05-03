@@ -1,14 +1,14 @@
 package Project.server;
 
 import Project.common.*;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch; //? Use a semaphore instead?
-import java.util.concurrent.Executors;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors; //? Use a semaphore instead?
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -23,9 +23,9 @@ public class BattleshipThread extends Thread {
   private countDown counterTimer;
   private volatile ServerThread currentPlayer;
 
-  private List<ServerThread> players = new ArrayList<>();
+  private List<ServerThread> players = new CopyOnWriteArrayList<>();
   private Iterator<ServerThread> playerIterator;
-  private List<ServerThread> spectators = new ArrayList<>();
+  private List<ServerThread> spectators = new CopyOnWriteArrayList<>();
 
   // private Map<ShipType, Integer> shipCounts = Map.of(
   //     ShipType.CARRIER, 1,
@@ -56,7 +56,7 @@ public class BattleshipThread extends Thread {
     this.salvoGameMode = salvoGameMode;
     this.room = room;
     playerIterator = players.iterator();
-    printGameInfo("Battleship game thread created\n");
+    printGameInfo("Battleship game thread created");
     counterTimer = new countDown(() -> { placementPhase(); }, playerCount, 180);
   }
 
@@ -65,7 +65,8 @@ public class BattleshipThread extends Thread {
   public void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
     Payload payload = new Payload();
     payload.setPayloadType(type);
-    payload.setClientName(player.getClientName());
+    // payload.setClientName(player.getClientName());
+    payload.setClientName("Game");
     payload.setMessage(message);
     payload.setNumber((long) (players.size() - 1));
     for (ServerThread p : players) { 
@@ -104,12 +105,12 @@ public class BattleshipThread extends Thread {
         List<Ship> ships = payload.getShipList();
 
         if (!validateShipCounts(ships)) { 
-          System.err.println("\nInvalid ship counts");
+          System.err.println("Invalid ship counts");
           sendGameMessage(player, "You cannot place any more ships");
           return;
         }
         if (!validateShipPlacements(ships, player.getGameBoard())) {
-          System.out.println("\nInvalid ship placement");
+          System.out.println("Invalid ship placement");
           sendGameMessage(player, "Invalid ship placement");
           return;
         }
@@ -273,7 +274,6 @@ public class BattleshipThread extends Thread {
     printGameInfo("The current player is: " + currentPlayer.getClientName());
 
     sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
-
   }
 
   private synchronized void handleAttack(ServerThread player, Map<String, List<Integer[]>> targetCoordinates) {
@@ -282,7 +282,7 @@ public class BattleshipThread extends Thread {
 
     printGameInfo(player.getClientName() + " is executing their attack (validated)");
 
-    printGameInfo(String.format("\nPlayer Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
+    printGameInfo(String.format("Player Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
 
     for (String name : targetCoordinates.keySet()) {
       List<Integer[]> coordinates = targetCoordinates.get(name);
@@ -327,7 +327,7 @@ public class BattleshipThread extends Thread {
           addSpectator(player);
           removePlayer(player);
         }
-        sendGameMessage(player, "\nTimeout reached, starting game phase, any players who have not placed their ships will be spectators, and any unplaced ships will be lost");
+        sendGameMessage(player, "Timeout reached, starting game phase, any players who have not placed their ships will be spectators, and any unplaced ships will be lost");
       }
     }, players.size(), 180);
 
@@ -356,6 +356,11 @@ public class BattleshipThread extends Thread {
     // sendGameEnd();
 
     isRunning = false;
+  }
+
+  protected void cleanup() {
+    counterTimer.close();
+    counterTimer = null;
   }
 }
 
@@ -389,9 +394,9 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
   public long getTimeRemaining() { return timeRemaining; }
 
   private void printTimer() {
-    if (timeRemaining < 10) System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_RED + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET);
-    else if (timeRemaining < 30) System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET);
-    else System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "   ");
+    if (timeRemaining < 10) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_RED + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "  \r");
+    else if (timeRemaining < 30) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + '\r');
+    else System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + '\r');
   }
 
   public void runLambdas() {
@@ -432,6 +437,18 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
       }
     } catch (InterruptedException e) {
       e.printStackTrace();
+    }
+  }
+  protected void close() {
+    if (executor != null) {
+      executor.shutdown();
+      try {
+        if (!executor.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+          executor.shutdownNow();
+        } 
+      } catch (InterruptedException e) {
+          executor.shutdownNow();
+      }
     }
   }
 }

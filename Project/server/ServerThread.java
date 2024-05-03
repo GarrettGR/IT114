@@ -19,7 +19,7 @@ public class ServerThread extends Thread {
   private boolean isSpectator = false;
   
 
-  private void info(String message) { System.out.println('\n' + String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message)); }
+  private void info(String message) { System.out.println(String.format("Thread[%s = \"%s\"]: %s", this.threadId(), this.clientName, message)); }
 
   public ServerThread(Socket myClient, Room room) {
     info("Thread created");
@@ -52,7 +52,7 @@ public class ServerThread extends Thread {
     gameBoard.setClientName(clientName);
   }
 
-  protected GameBoard getGameBoard() { return gameBoard; }
+  protected synchronized GameBoard getGameBoard() { return gameBoard; }
 
   protected boolean isAway() { return isAway; }
 
@@ -85,6 +85,8 @@ public class ServerThread extends Thread {
   }
 
   public void sendGameEvent(Payload p) {
+    System.out.println("Sending game event: " + p);
+    System.out.println("Sending to room: " + currentRoom.getName());
     send(p);
   }
 

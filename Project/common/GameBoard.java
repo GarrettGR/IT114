@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 public class GameBoard implements Serializable{
   private static final int BOARD_SIZE = 10;
-  private PieceType[][] board = getCleanBoard();
+  private PieceType[][] board = new PieceType[BOARD_SIZE][BOARD_SIZE]; //? Make volatile?
   private String clientName;
 
   private static final String ANSI_RESET = "\u001B[0m";
@@ -21,24 +21,22 @@ public class GameBoard implements Serializable{
 
   public GameBoard(String clientName) {
     this.clientName = clientName;
-    this.setBoard(getCleanBoard());
+    this.board = getCleanBoard();
   }
-
+  
   public GameBoard(GameBoard gameBoard) {
     this.clientName = gameBoard.clientName;
-    this.setBoard(gameBoard.board);
+    this.board = gameBoard.getBoard();
   }
 
   public GameBoard() { 
     this(""); 
-    this.setBoard(getCleanBoard());
+    this.board = getCleanBoard();
   }
 
   public int getBoardSize() { return BOARD_SIZE; }
 
-  public synchronized PieceType[][] getBoard() { return board; }
-
-  public GameBoard getProtectedCopy() {
+  public synchronized GameBoard getProtectedCopy() {
     GameBoard copy = new GameBoard(clientName);
     for (int i = 0; i < BOARD_SIZE; i++)
       for (int j = 0; j < BOARD_SIZE; j++)
@@ -47,9 +45,18 @@ public class GameBoard implements Serializable{
     return copy;
   }
 
-  public final synchronized void setBoard(PieceType[][] board) { this.board = board; }
+  public synchronized PieceType[][] getBoardCopy() {
+    PieceType[][] copy = new PieceType[BOARD_SIZE][BOARD_SIZE];
+    for (int i = 0; i < BOARD_SIZE; i++)
+      System.arraycopy(board[i], 0, copy[i], 0, BOARD_SIZE);
+    return copy;
+  }
+
+  public synchronized void setBoard(PieceType[][] board) { this.board = board; }
 
   public synchronized void setBoard(GameBoard gameBoard) { this.setBoard(gameBoard.getBoard()); }
+
+  public synchronized PieceType[][] getBoard() { return board; }
 
   public void setClientName(String clientName) { this.clientName = clientName; }
 
@@ -66,7 +73,7 @@ public class GameBoard implements Serializable{
     return false;
   }
 
-  public boolean placeShip(Ship ship) {
+  public synchronized  boolean placeShip(Ship ship) {
     PieceType[][] tempBoard = getCleanBoard();
     for (int i = 0; i < BOARD_SIZE; i++) System.arraycopy(this.board[i], 0, tempBoard[i], 0, BOARD_SIZE);
     int anchorX = ship.getAnchorX();
