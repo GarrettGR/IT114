@@ -73,10 +73,13 @@ public class BattleshipThread extends Thread {
       if (p == null) continue;
       if (p == currentPlayer) payload.setTurn(true);
       if (p == player) continue;
+      if (p.getGameBoard() == null) System.err.println("null gameBoard for: " + p.getClientName()); //? how to handle?
+      payload.setPlayerName(p.getClientName());
       payload.setPlayerBoard(p.getGameBoard());
       payload.setOpponentBoards(getOpponentBoards(p));
       p.sendGameEvent(payload);
     }
+    payload.setPlayerName(player.getClientName());
     payload.setMessage(privledgedMessage);
     payload.setOpponentBoards(getOpponentBoards(player));
     payload.setPlayerBoard(player.getGameBoard());
@@ -103,7 +106,6 @@ public class BattleshipThread extends Thread {
         if (started || player.getGameBoard().hasShips()) return;
         printGameInfo("Placing ships");
         List<Ship> ships = payload.getShipList();
-
         if (!validateShipCounts(ships)) { 
           System.err.println("Invalid ship counts");
           sendGameMessage(player, "You cannot place any more ships");
@@ -114,7 +116,6 @@ public class BattleshipThread extends Thread {
           sendGameMessage(player, "Invalid ship placement");
           return;
         }
-
         printGameInfo("Ships: ");
         for (Ship ship : ships) printGameInfo("  - " + ship);
         System.out.println();
@@ -122,7 +123,7 @@ public class BattleshipThread extends Thread {
         GameBoard board = player.getGameBoard() != null ? new GameBoard(player.getGameBoard()) : new GameBoard();
         for (Ship ship : ships) board.placeShip(ship);
 
-        printGameInfo(" Board: ");
+        printGameInfo("Board:");
         printGameInfo(board.toString());
 
         player.setGameBoard(board);
@@ -347,7 +348,7 @@ public class BattleshipThread extends Thread {
         sendGameMessage(currentPlayer, "Unfortunatley, you have run out of time, you will be skipped this turn");
         currentPlayer = getNextPlayer();
         sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
-      }, players.size() - 1, 90);
+      }, players.size() - 1, 600);
 
       printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
       counterTimer.runLambdas();
@@ -419,6 +420,7 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
         e.printStackTrace();
       }
     });
+  
     counter.start();
 
     ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
@@ -426,7 +428,6 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
       timeRemaining = timeoutSeconds - elapsedTime;
       // if ( ((int) elapsedTime) % 5 == 0) printTimer()  // to regulate how often it prints
         printTimer();
-      // System.out.println("Time remaining: " + timeRemaining + " seconds");
     }, 0, 1, TimeUnit.SECONDS);
 
     try {
@@ -439,6 +440,7 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
       e.printStackTrace();
     }
   }
+
   protected void close() {
     if (executor != null) {
       executor.shutdown();

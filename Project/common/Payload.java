@@ -5,30 +5,34 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class Payload implements Serializable {
   private static final long serialVersionUID = 1L;
   private PayloadType payloadType;
   private String clientName;
+  private String playerName;
   private String message;
   private long number;
   private boolean isTurn = false;
   private boolean isGameOver = false;
-  private GameBoard playerBoard;
-  private Map<String, GameBoard> opponentBoards = new HashMap<>(); // Username, GameBoard
+  private Map<String, GameBoard> boards = new HashMap<>(); // Username, GameBoard
   private List<Ship> ships = new ArrayList<>();
   private Map<String,  List<Integer[]>> coordinates = new HashMap<>(); // Username, coordinates
   
+  // Overloaded setters and getters is a little overkill... but I also kept wanting to deal with them slightly differently in different places... hopefully no weird errors come from this...
 
   public PayloadType getPayloadType() { return payloadType; }
-
-  // Overloaded setters and getters is a little overkill... but I also kept wanting to deal with them slightly differently in different places... hopefully no weird errors come from this...
 
   public void setPayloadType(PayloadType payloadType) { this.payloadType = payloadType; }
 
   public String getClientName() { return clientName; }
 
   public void setClientName(String clientName) { this.clientName = clientName; }
+
+  public String getPlayerName() { return playerName; }
+
+  public void setPlayerName(String playerName) { this.playerName = playerName; }
 
   public String getMessage() { return message; }
 
@@ -46,21 +50,27 @@ public class Payload implements Serializable {
 
   public boolean isGameOver() { return isGameOver; }
 
-  public void setPlayerBoard(GameBoard board) { this.playerBoard = board; }
+  public synchronized void setPlayerBoard(GameBoard board) { this.boards.put(playerName, board); }
 
-  public GameBoard getPlayerBoard() { return playerBoard; }
+  public synchronized GameBoard getPlayerBoard() { return this.boards.get(playerName); }
 
-  public void addOpponentBoard(String key, GameBoard board) { this.opponentBoards.put(key, board); }
+  public synchronized void addOpponentBoard(String key, GameBoard board) { this.boards.put(key, board); }
 
-  public void setOpponentBoards(Map<String, GameBoard> boards) { this.opponentBoards = boards; }
+  public synchronized void setOpponentBoards(Map<String, GameBoard> boards) { this.boards = boards; }
 
-  public Map<String, GameBoard> getOpponentBoardsMap() { return opponentBoards; }
+  public synchronized Map<String, GameBoard> getOpponentBoardsMap() {
+    return boards.entrySet().stream().filter(entry -> entry.getKey() != null && !entry.getKey().equals(this.playerName)).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
 
-  public GameBoard[] getOpponentBoards() { return opponentBoards.values().toArray(GameBoard[]::new); }
+  public synchronized GameBoard[] getOpponentBoards() {
+    return boards.entrySet().stream().filter(entry -> entry.getKey() != null && !entry.getKey().equals(this.playerName)).map(Map.Entry::getValue).toArray(GameBoard[]::new);  
+  }
 
-  public List<GameBoard> getOpponentBoardsList() { return new ArrayList<>(opponentBoards.values()); }
+  public synchronized List<GameBoard> getOpponentBoardsList() {
+    return boards.entrySet().stream().filter(entry -> entry.getKey() != null && !entry.getKey().equals(this.playerName)).map(Map.Entry::getValue).collect(Collectors.toList());
+  }
 
-  public GameBoard getOpponentBoard(String key) { return opponentBoards.get(key); }
+  public synchronized GameBoard getOpponentBoard(String key) { return key.equals(this.playerName) ? boards.get(key) : null; }
 
   public void addShip(Ship ship) { this.ships.add(ship); }
 

@@ -4,12 +4,13 @@ import Project.common.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Room implements AutoCloseable {
   protected static Server server;
   private final String name;
-  private List<ServerThread> clients = new ArrayList<>();
-  private List<BattleshipThread> games = new ArrayList<>();
+  private List<ServerThread> clients = new CopyOnWriteArrayList<>();
+  private List<BattleshipThread> games = new CopyOnWriteArrayList<>();
   private boolean isRunning = false;
 
   private final static String COMMAND_TRIGGER = "/";
@@ -304,16 +305,19 @@ public class Room implements AutoCloseable {
   }
 
   private void handleDisconnect(Iterator<ServerThread> iter, ServerThread client) {
+    List<BattleshipThread> gamesToRemove = new ArrayList<>();
     for (BattleshipThread game : games) {
       if (game.hasPlayer(client)) {
         game.removePlayer(client);
         if (game.getPlayers().isEmpty()) {
-          games.remove(game);
+          gamesToRemove.add(game);
           game.cleanup();
         }
       }
     }
+    games.removeAll(gamesToRemove);
     iter.remove();
+    info("Removed game(s): " + gamesToRemove.size());
     info("Removed client " + client.getClientName());
     checkClients();
     sendMessage(null, client.getClientName() + " disconnected");

@@ -16,12 +16,12 @@ public class Server {
     this.port = port;
     try (ServerSocket serverSocket = new ServerSocket(port);) {
       Socket incoming_client = null;
-      System.out.print("Server is listening on port " + port);
+      System.out.println("Server is listening on port " + port);
       Room.server = this;
       lobby = new Room("Lobby");
       rooms.add(lobby);
       do {
-        System.out.print( "waiting for next client");
+        System.out.println( "waiting for next client");
         if (incoming_client != null) {
           System.out.println( "Client connected");
           ServerThread sClient = new ServerThread(incoming_client, lobby);
