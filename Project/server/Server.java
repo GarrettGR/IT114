@@ -23,7 +23,7 @@ public class Server {
       do {
         System.out.println("waiting for next client");
         if (incoming_client != null) {
-          System.out.print('\n' + "Client connected" + '\n');
+          System.out.println("Client connected");
           ServerThread sClient = new ServerThread(incoming_client, lobby);
           sClient.start();
           joinRoom("lobby", sClient);
@@ -31,10 +31,10 @@ public class Server {
         }
       } while ((incoming_client = serverSocket.accept()) != null);
     } catch (IOException e) {
-      System.err.print('\n' +"Error accepting connection + '\n'");
+      System.err.println("Error accepting connection");
       e.printStackTrace();
     } finally {
-      System.out.print('\n' +"closing server socket" + '\n');
+      System.out.println("closing server socket");
     }
   }
 
@@ -57,10 +57,10 @@ public class Server {
     Room oldRoom = client.getCurrentRoom();
     if (newRoom != null) {
       if (oldRoom != null) {
-        System.out.print('\n' + client.getName() + " leaving room " + oldRoom.getName() + '\n');
+        System.out.println(client.getName() + " leaving room " + oldRoom.getName());
         oldRoom.removeClient(client);
       }
-      System.out.print('\n' + client.getName() + " joining room " + newRoom.getName() + '\n');
+      System.out.println(client.getName() + " joining room " + newRoom.getName());
       newRoom.addClient(client);
       return true;
     } else {
@@ -72,18 +72,18 @@ public class Server {
 
   protected synchronized boolean createNewRoom(String roomName) {
     if (getRoom(roomName) != null) {
-      System.out.print('\n' + String.format("Room %s already exists", roomName) + '\n');
+      System.out.println(String.format("Room %s already exists", roomName));
       return false;
     } else {
       Room room = new Room(roomName);
       rooms.add(room);
-      System.out.print('\n' + "Created new room: " + roomName + '\n');
+      System.out.println("Created new room: " + roomName);
       return true;
     }
   }
 
   protected synchronized void removeRoom(Room r) { 
-    if (rooms.removeIf(room -> room == r)) System.out.print('\n' + "Removed empty room " + r.getName() + '\n');
+    if (rooms.removeIf(room -> room == r)) System.out.println("Removed empty room " + r.getName());
   }
 
   protected String generateUniqueName() {
@@ -114,7 +114,7 @@ public class Server {
   }
 
   public static void main(String[] args) {
-    System.out.println('\n' +"Starting Server");
+    System.out.println("Starting Server");
     Server server = new Server();
     int port = 3000;
     try {
@@ -123,6 +123,6 @@ public class Server {
 
     }
     server.start(port);
-    System.out.println('\n' +"Server Stopped");
+    System.out.println("Server Stopped");
   }
 }

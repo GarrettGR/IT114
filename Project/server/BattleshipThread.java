@@ -56,7 +56,7 @@ public class BattleshipThread extends Thread {
     this.salvoGameMode = salvoGameMode;
     this.room = room;
     playerIterator = players.iterator();
-    printGameInfo("Battleship game thread created\n");
+    printGameInfo("Battleship game thread created");
     counterTimer = new countDown(() -> { placementPhase(); }, playerCount, 180);
   }
 
@@ -65,7 +65,7 @@ public class BattleshipThread extends Thread {
   public void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
     Payload payload = new Payload();
     payload.setPayloadType(type);
-    payload.setClientName(player.getClientName());
+    payload.setClientName("Game"); //? should this be the client/player name?
     payload.setMessage(message);
     payload.setNumber((long) (players.size() - 1));
     for (ServerThread p : players) { 
@@ -111,7 +111,7 @@ public class BattleshipThread extends Thread {
           return;
         }
         if (!validateShipPlacements(ships, player.getGameBoard())) {
-          System.out.println("\nInvalid ship placement");
+          System.out.println("Invalid ship placement");
           sendGameMessage(player, "Invalid ship placement");
           return;
         }
@@ -274,7 +274,6 @@ public class BattleshipThread extends Thread {
     printGameInfo("The current player is: " + currentPlayer.getClientName());
 
     sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
-
   }
 
   private synchronized void handleAttack(ServerThread player, Map<String, List<Integer[]>> targetCoordinates) {
@@ -283,7 +282,7 @@ public class BattleshipThread extends Thread {
 
     printGameInfo(player.getClientName() + " is executing their attack (validated)");
 
-    printGameInfo(String.format("\nPlayer Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
+    printGameInfo(String.format("Player Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
 
     for (String name : targetCoordinates.keySet()) {
       List<Integer[]> coordinates = targetCoordinates.get(name);
@@ -328,7 +327,7 @@ public class BattleshipThread extends Thread {
           addSpectator(player);
           removePlayer(player);
         }
-        sendGameMessage(player, "\nTimeout reached, starting game phase, any players who have not placed their ships will be spectators, and any unplaced ships will be lost");
+        sendGameMessage(player, "Timeout reached, starting game phase, any players who have not placed their ships will be spectators, and any unplaced ships will be lost");
       }
     }, players.size(), 180);
 
