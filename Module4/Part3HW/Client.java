@@ -17,6 +17,7 @@ public class Client {
 
     public static final String ANSI_RESET = "\u001B[0m";
     public static final String ANSI_YELLOW = "\u001B[33m";
+    public static final String ANSI_ORANGE = "\u001B[38;5;208m";
     public static final String ANSI_RED = "\u001B[31m";
     public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
     public static final String UNIX_CLEAR = "\033[H\033[2J";
@@ -45,7 +46,9 @@ public class Client {
     public static void server_print(String message) {
         if (message.startsWith("Server:")) {
             System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
-        } else {
+        } else if (message.startsWith("Game:")) {
+            System.out.println(ANSI_GRAY_BG + ANSI_ORANGE + message + ANSI_RESET);
+        }else {
             System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
         }
     }

@@ -38,7 +38,7 @@ public class Server {
         }
     }
     protected synchronized void disconnect(ServerThread client) {
-		long id = client.getId();
+		long id = client.threadId();
         client.disconnect();
 		broadcast("Disconnected", id);
 	}
@@ -60,7 +60,7 @@ public class Server {
             ServerThread client = it.next();
             boolean wasSuccessful = client.send(message);
             if (!wasSuccessful) {
-                System.out.println(String.format("Removing disconnected client[%s] from list", client.getId()));
+                System.out.println(String.format("Removing disconnected client[%s] from list", client.threadId()));
                 it.remove();
                 broadcast("Disconnected", id);
             }
@@ -73,7 +73,7 @@ public class Server {
             Iterator<ServerThread> it = clients.iterator();
             while (it.hasNext()) {
                 ServerThread client = it.next();
-                if(client.getId() == clientId){
+                if(client.threadId() == clientId){
                     it.remove();
                     disconnect(client);
                     
