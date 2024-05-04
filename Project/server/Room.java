@@ -234,12 +234,11 @@ public class Room implements AutoCloseable {
           //   }
           //   break;
           case "turn", "board", "boards", "players", "spectators", "game", "leavegame":
-            for (BattleshipThread game : games) {
+            for (BattleshipThread game : games)
               if (game.hasPlayer(client)) {
                 game.processCommand(client, message.substring(1));
-                break;
+                return true;
               }
-            }
             client.sendMessage("Server", "Invalid command or you are not in a game");
             break;
           case LEAVE_ROOM:
@@ -249,11 +248,12 @@ public class Room implements AutoCloseable {
             Room.disconnectClient(client, this);
             break;
           default:
+            client.sendMessage("Server", "Invalid command (sending as a message instead)");
             wasCommand = false;
             break;
+          }
         }
-      }
-    } catch (Exception e) {
+      } catch (Exception e) {
     }
     return wasCommand;
   }

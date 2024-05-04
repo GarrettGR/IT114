@@ -270,6 +270,7 @@ public class Client {
 
   private void attackPlayer(String target, int row, int column) {
     List<Integer[]> coords = new ArrayList<>();
+    String targetName = target.substring(-2);
     if (!isTurn) {
       system_error("It is not your turn");
       return;
@@ -278,17 +279,17 @@ public class Client {
       system_error("Invalid coordinates");
       return;
     }
-    if (opponentBoards.get(target) == null) {
+    if (opponentBoards.get(targetName) == null) {
       system_error("Invalid target");
       return;
     }
-    if (opponentBoards.get(target).getPiece(row - 1, column - 1) == PieceType.HIT || opponentBoards.get(target).getPiece(row - 1, column - 1) == PieceType.MISS) {
+    if (opponentBoards.get(targetName).getPiece(row - 1, column - 1) == PieceType.HIT || opponentBoards.get(targetName).getPiece(row - 1, column - 1) == PieceType.MISS) {
       system_error("You have already targeted that location");
       return;
     }
     coords.add(new Integer[]{row - 1, column - 1});
-    this.coordinates.put(target, coords);
-    opponentBoards.remove(target);
+    this.coordinates.put(targetName, coords);
+    opponentBoards.remove(targetName);
     // sendGameEvent(PayloadType.GAME_TURN, target, row - 1, column - 1);
     if (this.opponentBoards.isEmpty()) sendGameEvent(PayloadType.GAME_TURN, this.coordinates); // send the attacks when all players have attacked
   }
@@ -426,6 +427,7 @@ public class Client {
         inGame = true;
         ships = p.getShipList();
         playerBoard.setBoard(p.getPlayerBoard());
+        playerBoard.setClientName("Your");
         System.out.print(p.getMessage() + '\n' + playerBoard.toString());
         printShips();
       }
@@ -438,10 +440,11 @@ public class Client {
         this.isTurn = p.isTurn();
         this.placedShips = new ArrayList<>(); // reset turn-specific data
         this.coordinates = new HashMap<>();
-        this.playerBoard = p.getPlayerBoard();
+        this.playerBoard = new GameBoard(p.getPlayerBoard());
+        this.playerBoard.setClientName("Your");
         this.opponentBoards = p.getOpponentBoardsMap();
 
-        drawGame(p.getPlayerBoard(), p.getOpponentBoards(), p.getMessage());
+        drawGame(this.playerBoard, p.getOpponentBoards(), p.getMessage());
       }
       case PING -> { /* do nothing */ }
       default -> throw new IllegalArgumentException("Unexpected value: " + p.getPayloadType());

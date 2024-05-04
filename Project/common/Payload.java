@@ -15,7 +15,8 @@ public class Payload implements Serializable {
   private boolean isTurn = false;
   private boolean isGameOver = false;
   private boolean isRename = false;
-  private GameBoard playerBoard;
+
+  private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>(); // Username, GameBoard
   private List<Ship> ships = new ArrayList<>();
   private Map<String,  List<Integer[]>> coordinates = new HashMap<>(); // Username, coordinates
@@ -50,7 +51,7 @@ public class Payload implements Serializable {
 
   public boolean isGameOver() { return isGameOver; }
 
-  public void setPlayerBoard(GameBoard board) { this.playerBoard = board; }
+  public void setPlayerBoard(GameBoard board) { this.playerBoard.setBoard(board); }
 
   public GameBoard getPlayerBoard() { return playerBoard; }
 

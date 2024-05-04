@@ -12,7 +12,7 @@ public class ServerThread extends Thread {
   private boolean isRunning = false;
   private ObjectOutputStream out;
   private Room currentRoom;
-  volatile private GameBoard gameBoard = new GameBoard();
+  private GameBoard gameBoard = new GameBoard();
   private boolean isAway = false;
   private boolean isReady = false;
   private boolean isTurn = false;
@@ -56,8 +56,8 @@ public class ServerThread extends Thread {
 
   protected synchronized void setGameBoard(GameBoard board) { 
     // gameBoard = board; // This is a shallow copy -- is this okay?
-    gameBoard.setBoard(board.getBoard());
-    gameBoard.setClientName(clientName);
+    this.gameBoard.setBoard(board.getCopy());
+    this.gameBoard.setClientName(clientName);
   }
 
   protected synchronized GameBoard getGameBoard() { return this.gameBoard; }

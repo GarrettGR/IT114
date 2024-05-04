@@ -6,7 +6,7 @@ public class Ship implements Serializable{
   private int anchorX;
   private int anchorY;
   private String orientation;
-  // private int[] fuselage; // TODO: could use this and procedureally draw board each time from just list of ships 
+  // private int[] fuselage; // TODO: could use this and procedureally draw board each time from just list of ships (& tracks their damage)
   private ShipType type;
 
   public Ship(ShipType type) { 

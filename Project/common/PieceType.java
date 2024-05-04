@@ -15,7 +15,7 @@ public enum PieceType {
           case SHIP -> ANSI_RESET + SQUARE;
           case HIT -> ANSI_RESET + ANSI_RED + SQUARE + ANSI_RESET;
           case MISS -> ANSI_RESET + ANSI_YELLOW + SQUARE + ANSI_RESET;
-          default -> " ";
+          default -> "?";
       };
   }
 }

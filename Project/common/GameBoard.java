@@ -4,19 +4,24 @@ import java.io.Serializable;
 
 public class GameBoard implements Serializable{
   private static final int BOARD_SIZE = 10;
-  volatile private PieceType[][] board = getCleanBoard();
+  private PieceType[][] board = new PieceType[BOARD_SIZE][BOARD_SIZE];
   private String clientName;
 
   private static final String ANSI_RESET = "\u001B[0m";
   private static final String ANSI_YELLOW = "\u001B[33m";
   private static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
 
-  public final PieceType[][] getCleanBoard() {
+  public static PieceType[][] getCleanBoard() {
     PieceType cleanBoard[][] = new PieceType[BOARD_SIZE][BOARD_SIZE];
     for (int i = 0; i < BOARD_SIZE; i++)
       for (int j = 0; j < BOARD_SIZE; j++)
         cleanBoard[i][j] = PieceType.EMPTY;
     return cleanBoard;
+  }
+
+  public GameBoard(String clientName, PieceType[][] board) {
+    this.clientName = clientName;
+    this.board = board;
   }
 
   public GameBoard(String clientName) {
@@ -25,8 +30,8 @@ public class GameBoard implements Serializable{
   }
 
   public GameBoard(GameBoard gameBoard) {
-    this.clientName = gameBoard.clientName;
-    this.board = getCleanBoard();
+    this.clientName = gameBoard.getClientName();
+    this.board = gameBoard.getBoard();
   }
 
   public GameBoard() { 
@@ -56,7 +61,7 @@ public class GameBoard implements Serializable{
 
   public synchronized void setBoard(PieceType[][] board) { this.board = board; }
 
-  public synchronized void setBoard(GameBoard gameBoard) { this.setBoard(gameBoard.getBoard()); }
+  public synchronized void setBoard(GameBoard gameBoard) { this.setBoard(gameBoard.getCopy().getBoard()); }
 
   public void setClientName(String clientName) { this.clientName = clientName; }
 
@@ -102,7 +107,7 @@ public class GameBoard implements Serializable{
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(ANSI_RESET).append(ANSI_YELLOW).append(String.format("%s's board:\n", clientName)).append(ANSI_RESET).append("   1  2  3  4  5  6  7  8  9  10").append('\n');
+    sb.append(ANSI_RESET).append(ANSI_YELLOW).append(String.format("%s board:\n", clientName)).append(ANSI_RESET).append("   1  2  3  4  5  6  7  8  9  10").append('\n');
     int index = 1;
     for (PieceType[] row : board) {
       sb.append(index % 10 != 0 ? (" " + index) : index);

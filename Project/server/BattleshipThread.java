@@ -21,7 +21,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private boolean isRunning = false;
   private String phase;
   private countDown counterTimer;
-  private volatile ServerThread currentPlayer;
+  private ServerThread currentPlayer; //? make this volatile?
 
   private List<ServerThread> players = new ArrayList<>();
   private Iterator<ServerThread> playerIterator;
@@ -36,7 +36,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   //     ShipType.LIFE_BOAT, 1
   //   );
 
-  private Map<ShipType, Integer> shipCounts = Map.of( // testing with fewer ships to save time
+  private Map<ShipType, Integer> shipCounts = Map.of( //! testing with fewer ships to save time
     ShipType.CARRIER, 0,
     ShipType.BATTLESHIP, 1,
     ShipType.CRUISER, 0,
@@ -65,7 +65,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     this.room = room;
     playerIterator = players.iterator();
     printGameInfo("Battleship game thread created");
-    counterTimer = new countDown(() -> { placementPhase(); }, playerCount, 180);
+    counterTimer = new countDown(() -> { placementPhase(); }, playerCount < 4 ? playerCount : 4, 180);
   }
 
   protected static void printGameInfo(String message) { System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET); }
@@ -175,12 +175,14 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     switch (payload.getPayloadType()) {
       case GAME_START ->  addPlayer(player);
       case GAME_PLACE -> {
-        if (started || player.getGameBoard().hasShips()) return;
+        if (started || player.getGameBoard().hasShips()) {
+          player.sendMessage("Game", "You cannot place any ships right now");
+          return;
+        }
         printGameInfo("Placing ships");
         List<Ship> ships = payload.getShipList();
         if (!validateShipCounts(ships)) { 
           System.err.println("Invalid ship counts");
-          sendGameMessage(player, "You cannot place any more ships");
           return;
         }
         if (!validateShipPlacements(ships, player.getGameBoard())) {
@@ -195,10 +197,10 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         GameBoard board = player.getGameBoard() != null ? new GameBoard(player.getGameBoard()) : new GameBoard();
         for (Ship ship : ships) board.placeShip(ship);
 
+        player.setGameBoard(board);
         printGameInfo("Board:");
         printGameInfo(board.toString());
 
-        player.setGameBoard(board);
         printGameInfo("Ships placed successfully for " + player.getClientName()); 
         sendGameMessage(player, "You have placed your ships, waiting for other players");
         counterTimer.decrement();
@@ -285,7 +287,9 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     Map<String, GameBoard> boards = new HashMap<>();
     for (ServerThread opponent : players) {
       if (opponent == player) continue;
-      boards.put(opponent.getClientName(), opponent.getGameBoard().getProtectedCopy());
+      GameBoard board = opponent.getGameBoard().getProtectedCopy();
+      board.setClientName(player.getClientName() + "'s");
+      boards.put(opponent.getClientName(), board);
     }
     return boards;
   }
@@ -300,6 +304,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   }
 
   private boolean validateShipPlacements(List<Ship> ships, GameBoard gameBoard) {
+    if (gameBoard == null) return false;
     GameBoard tempGameBoard = new GameBoard(gameBoard);
     for (Ship ship : ships) if (!tempGameBoard.placeShip(ship)) return false;
     return true;
@@ -313,7 +318,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private void placementPhase() { // implement another latch for this? reuse the same latch?
     printGameInfo("Begin placmemnt phase");
     phase = "placement";
-    for (ServerThread player : players) {
+    for (ServerThread player : players) {      
       Payload p = new Payload();
       p.setPayloadType(PayloadType.GAME_PLACE);
       p.setClientName("Game");
@@ -392,6 +397,18 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     printGameInfo("All players who are going to play have joined");
     printGameInfo("Game thread running");
 
+    if (players.size() < 2) {
+      printGameInfo("Not enough players to start the game");
+      isRunning = false;
+      cleanup();
+      return;
+    } else if (players.size() > 4) {
+      printGameInfo("Too many players to start the game");
+      isRunning = false;
+      cleanup();
+      return;
+    }
+
     counterTimer = new countDown(() -> { gamePhaseInitializer(); }, () -> { 
       gamePhaseInitializer(); 
       for (ServerThread player : players) {
@@ -420,13 +437,13 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         sendGameMessage(currentPlayer, "Unfortunatley, you have run out of time, you will be skipped this turn");
         currentPlayer = getNextPlayer();
         sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
-      }, players.size() - 1, 120); //! Adjust the time for testing
+      }, players.size() - 1, 60);
 
       printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
       counterTimer.runLambdas();
     }
 
-    // sendGameEnd();
+    sendGameMessage("The game has ended, there is only one player left: " + players.get(0).getClientName());
 
     isRunning = false;
   }
@@ -468,8 +485,8 @@ class countDown { //? implement auto-closeable?
 
   private void printTimer() {
     if (timeRemaining < 10) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_RED + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "  \r");
-    else if (timeRemaining < 30) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + '\r');
-    else System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + '\r');
+    else if (timeRemaining < 30) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "  \r");
+    else System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "  \r");
   }
 
   public void runLambdas() {
