@@ -38,10 +38,10 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   private Map<ShipType, Integer> shipCounts = Map.of( //! testing with fewer ships to save time
     ShipType.CARRIER, 0,
-    ShipType.BATTLESHIP, 1,
+    ShipType.BATTLESHIP, 0,
     ShipType.CRUISER, 0,
-    ShipType.SUBMARINE, 1,
-    ShipType.DESTROYER, 0,
+    ShipType.SUBMARINE,  0,
+    ShipType.DESTROYER, 1,
     ShipType.LIFE_BOAT, 0
   );
 
@@ -258,7 +258,9 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   protected synchronized void addSpectator(ServerThread spectator) { spectators.add(spectator); }
 
-  protected synchronized void removePlayer(ServerThread player) { players.remove(player); }
+  protected synchronized void removePlayer(ServerThread player) { 
+    players.remove(player); 
+  }
 
   protected synchronized void removeSpectator(ServerThread spectator) { spectators.remove(spectator); }
 
@@ -288,7 +290,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     for (ServerThread opponent : players) {
       if (opponent == player) continue;
       GameBoard board = opponent.getGameBoard().getProtectedCopy();
-      board.setClientName(player.getClientName() + "'s");
+      board.setClientName(opponent.getClientName() + "'s");
       boards.put(opponent.getClientName(), board);
     }
     return boards;
@@ -312,10 +314,17 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   private ServerThread getNextPlayer() {
     if (!playerIterator.hasNext()) playerIterator = players.iterator();
-    return playerIterator.next();
+    ServerThread player = playerIterator.next();
+    if (!player.getGameBoard().hasShips()) {
+      removePlayer(player);
+      addSpectator(player);
+      return getNextPlayer();
+    }
+    return player;
   }
 
-  private void placementPhase() { // implement another latch for this? reuse the same latch?
+  private void placementPhase() {
+    if(players.size() < 2 || players.size() > 4) return;
     printGameInfo("Begin placmemnt phase");
     phase = "placement";
     for (ServerThread player : players) {      
@@ -394,20 +403,22 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     printGameInfo("Waiting for players to join");
     counterTimer.runLambdas(); // just a counter that does nothing but wait for up to 4 people to join (or 3 minutes to pass)
 
-    printGameInfo("All players who are going to play have joined");
-    printGameInfo("Game thread running");
-
     if (players.size() < 2) {
       printGameInfo("Not enough players to start the game");
+      sendGameMessage("Not enough players to start the game");
       isRunning = false;
       cleanup();
       return;
     } else if (players.size() > 4) {
       printGameInfo("Too many players to start the game");
+      sendGameMessage("Too many players to start the game");
       isRunning = false;
       cleanup();
       return;
     }
+
+    printGameInfo("All players who are going to play have joined");
+    printGameInfo("Game thread running");
 
     counterTimer = new countDown(() -> { gamePhaseInitializer(); }, () -> { 
       gamePhaseInitializer(); 
@@ -427,7 +438,9 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     printGameInfo("All players who are playing have placed their ships");
     printGameInfo("Game Flow: turns starting");
 
-    while (players.size() > 1) { //? should this be a while loop?
+    while (isRunning) {
+      printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
+
       counterTimer = new countDown(() -> { 
         printGameInfo("The old current player was: " + ANSI_RED + currentPlayer.getClientName() + ANSI_YELLOW + " and they have finished their turn");
         currentPlayer = getNextPlayer();
@@ -438,18 +451,21 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         currentPlayer = getNextPlayer();
         sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
       }, players.size() - 1, 60);
-
-      printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
-      counterTimer.runLambdas();
+        if (players.size() <= 1) break;
+        counterTimer.runLambdas();
     }
 
     sendGameMessage("The game has ended, there is only one player left: " + players.get(0).getClientName());
+    removePlayer(players.get(0));
 
     isRunning = false;
   }
   protected void cleanup() {
     counterTimer.close();
     counterTimer = null;
+    isRunning = false;
+    room.removeGame(this);
+    printGameInfo("Game thread has ended");
   }
 }
 
@@ -512,22 +528,22 @@ class countDown { //? implement auto-closeable?
   
     counter.start();
 
-    ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
+    try {
+      ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
       long elapsedTime = (System.currentTimeMillis() - startTime) / 1000;
       timeRemaining = timeoutSeconds - elapsedTime;
-      // if ( ((int) elapsedTime) % 5 == 0) printTimer()  // to regulate how often it prints
         printTimer();
-    }, 0, 1, TimeUnit.SECONDS);
-
-    try {
-      counter.join();
-      if (latch.getCount() == 0) {
-        future.cancel(true);
-        executor.shutdown();
+      }, 0, 1, TimeUnit.SECONDS);
+      try {
+        counter.join();
+        if (latch.getCount() == 0) {
+          future.cancel(true);
+          executor.shutdown();
+        }
+      } catch (InterruptedException e) {
+        e.printStackTrace();
       }
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    } catch (Exception e) {}
   }
 
   protected void close() {

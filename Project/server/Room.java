@@ -65,6 +65,10 @@ public class Room implements AutoCloseable {
     checkClients();
   }
 
+  protected synchronized void addGame(BattleshipThread game) { games.add(game); }
+
+  protected synchronized void removeGame(BattleshipThread game) { games.remove(game); }
+
   protected List<ServerThread> getClients() { return clients; }
 
   protected List<BattleshipThread> getGames() { return games; }

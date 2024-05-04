@@ -127,6 +127,7 @@ public class Client {
   public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
 
   private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards, String message) {
+    System.out.print(UNIX_CLEAR);
     for (GameBoard board : opponentBoards) {
       System.out.print(board.toString() + "  ");
       for (int i = 0; i < 30; i++) game_print("-");
@@ -270,7 +271,6 @@ public class Client {
 
   private void attackPlayer(String target, int row, int column) {
     List<Integer[]> coords = new ArrayList<>();
-    String targetName = target.substring(-2);
     if (!isTurn) {
       system_error("It is not your turn");
       return;
@@ -279,17 +279,17 @@ public class Client {
       system_error("Invalid coordinates");
       return;
     }
-    if (opponentBoards.get(targetName) == null) {
+    if (opponentBoards.get(target) == null) {
       system_error("Invalid target");
       return;
     }
-    if (opponentBoards.get(targetName).getPiece(row - 1, column - 1) == PieceType.HIT || opponentBoards.get(targetName).getPiece(row - 1, column - 1) == PieceType.MISS) {
+    if (opponentBoards.get(target).getPiece(row - 1, column - 1) == PieceType.HIT || opponentBoards.get(target).getPiece(row - 1, column - 1) == PieceType.MISS) {
       system_error("You have already targeted that location");
       return;
     }
     coords.add(new Integer[]{row - 1, column - 1});
-    this.coordinates.put(targetName, coords);
-    opponentBoards.remove(targetName);
+    this.coordinates.put(target, coords);
+    opponentBoards.remove(target);
     // sendGameEvent(PayloadType.GAME_TURN, target, row - 1, column - 1);
     if (this.opponentBoards.isEmpty()) sendGameEvent(PayloadType.GAME_TURN, this.coordinates); // send the attacks when all players have attacked
   }
