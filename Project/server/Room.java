@@ -13,6 +13,7 @@ public class Room implements AutoCloseable {
   private boolean isRunning = false;
 
   private final static String COMMAND_TRIGGER = "/";
+  private final static String ROOM = "room";
   private final static String LIST_ROOMS = "rooms";
   private final static String CREATE_ROOM = "createroom";
   private final static String JOIN_ROOM = "joinroom";
@@ -23,7 +24,7 @@ public class Room implements AutoCloseable {
   private final static String RENAME = "rename";
   private final static String NAME = "name";
   private final static String PM = "pm";
-  private final static String GAME_PLAY = "play";
+  private final static String GAME_PLAY = "creategame";
   private final static String GAME_LIST = "games";
 
   public Room(String name) {
@@ -94,12 +95,18 @@ public class Room implements AutoCloseable {
             Room.joinRoom(roomName, client);
             break;
           case LIST_ROOMS:
+            if (server.listRoomNames().length == 1) {
+              client.sendMessage("Server", "No rooms have been created yet");
+              break;
+            }
             StringBuilder rooms = new StringBuilder();
             rooms.append("Rooms:");
-            for (String room : server.listRoomNames()) {
-              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n").append(room);
-            }
+            for (String room : server.listRoomNames())
+              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n").append(room).append(" (").append(server.getRoom(room).getClients().size()).append(")");
             client.sendMessage("Server", rooms.toString());
+            break;
+          case ROOM:
+            client.sendMessage("Server", "You are in room: " + this.name);
             break;
           case USERS:
             StringBuilder list = new StringBuilder();
@@ -110,7 +117,9 @@ public class Room implements AutoCloseable {
             }
             client.sendMessage("Server",list.toString());
             break;
-          case RENAME, NAME:
+          case NAME:
+            if (comm2.length == 1) client.sendMessage("Server", "your name is: " + client.getClientName());
+          case RENAME:
             String newName = comm2[1];
             if (!isTakenName(newName)) {
               client.setClientName(newName);
@@ -160,6 +169,10 @@ public class Room implements AutoCloseable {
             }
             break;
           case GAME_LIST:
+            if (games.isEmpty()) {
+              client.sendMessage("Server", "No games are currently running");
+              break;
+            }
             StringBuilder gameList = new StringBuilder();
             gameList.append("Games:");
             for (BattleshipThread game : games) {
@@ -211,8 +224,27 @@ public class Room implements AutoCloseable {
             newGame.start();
             games.add(newGame);
             break;
+          // case "joingame":
+          //   int gameId = Integer.parseInt(comm2[1]);
+          //   for (BattleshipThread game : games) {
+          //     if (game.threadId() == gameId) {
+          //       game.addPlayer(client);
+          //       break;
+          //     }
+          //   }
+          //   break;
+          case "turn", "board", "boards", "players", "spectators", "game", "leavegame":
+            for (BattleshipThread game : games) {
+              if (game.hasPlayer(client)) {
+                game.processCommand(client, message.substring(1));
+                break;
+              }
+            }
+            client.sendMessage("Server", "Invalid command or you are not in a game");
+            break;
           case LEAVE_ROOM:
-            Room.joinRoom("Lobby", client);
+            Room.joinRoom("lobby", client);
+            break;
           case DISCONNECT, LOGOFF:
             Room.disconnectClient(client, this);
             break;
@@ -235,7 +267,8 @@ public class Room implements AutoCloseable {
   }
 
   protected static void joinRoom(String roomName, ServerThread client) {
-    if (!server.joinRoom(roomName, client)) client.sendMessage("Server", String.format("Room %s doesn't exist", roomName));
+    // if (!server.joinRoom(roomName, client)) client.sendMessage("Server", String.format("Room %s doesn't exist", roomName)); // The message is redundant (server already sends one)
+    server.joinRoom(roomName, client);
   }
 
   protected static void disconnectClient(ServerThread client, Room room) {
@@ -294,11 +327,14 @@ public class Room implements AutoCloseable {
           Thread.sleep(5000); // wait for 5 seconds
         } catch (InterruptedException e) {
         }
-        Iterator<ServerThread> iter = clients.iterator(); //? try-catch? clients.iterator() could be null
-        while (iter.hasNext()) {
-          ServerThread client = iter.next();
-          if (!client.sendPing()) handleDisconnect(iter, client);
-        }
+        try{ 
+          checkClients();
+          Iterator<ServerThread> iter = clients.iterator();
+          while (iter.hasNext()) {
+            ServerThread client = iter.next();
+            if (!client.sendPing()) handleDisconnect(iter, client);
+          }
+        } catch(Exception e) {}
       }
     }).start();
   }

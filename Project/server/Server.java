@@ -9,7 +9,7 @@ import java.util.List;
 
 public class Server {
   int port = 3001;
-  private List<Room> rooms = new ArrayList<Room>();
+  private List<Room> rooms = new ArrayList<>();
   private Room lobby = null;
 
   private void start(int port) {
@@ -38,7 +38,7 @@ public class Server {
     }
   }
 
-  private Room getRoom(String roomName) {
+  protected Room getRoom(String roomName) {
     for (int i = 0, l = rooms.size(); i < l; i++)
       if (rooms.get(i).getName().equalsIgnoreCase(roomName))
         return rooms.get(i);

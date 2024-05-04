@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 public class GameBoard implements Serializable{
   private static final int BOARD_SIZE = 10;
-  private PieceType[][] board = getCleanBoard();
+  volatile private PieceType[][] board = getCleanBoard();
   private String clientName;
 
   private static final String ANSI_RESET = "\u001B[0m";

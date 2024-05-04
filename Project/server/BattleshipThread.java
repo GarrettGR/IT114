@@ -13,7 +13,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class BattleshipThread extends Thread {
+public class BattleshipThread extends Thread { //? implement auto-closeable?
   private final Room room;
   private boolean hardDifficulty;
   private boolean salvoGameMode;
@@ -50,6 +50,14 @@ public class BattleshipThread extends Thread {
   protected static final String ANSI_RED = "\u001B[31m";
   protected static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
   protected static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
+  private static final String TURN = "turn";
+  private static final String BOARD = "board";
+  private static final String BOARDS = "boards";
+  private static final String PLAYERS = "players";
+  private static final String SPECTATORS = "spectators";
+  private static final String GAME = "game";
+  private static final String LEAVE_GAME = "leave game";
+
 
   public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode, int playerCount) {
     this.hardDifficulty = hardDifficulty;
@@ -72,13 +80,10 @@ public class BattleshipThread extends Thread {
       if (p == null) continue;
       if (p == currentPlayer) payload.setTurn(true);
       if (p == player) continue;
-      if (p.getGameBoard() == null) System.err.println("null gameBoard for: " + p.getClientName()); //? how to handle?
-      payload.setPlayerName(p.getClientName());
       payload.setPlayerBoard(p.getGameBoard());
       payload.setOpponentBoards(getOpponentBoards(p));
       p.sendGameEvent(payload);
     }
-    payload.setPlayerName(player.getClientName());
     payload.setMessage(privledgedMessage);
     payload.setOpponentBoards(getOpponentBoards(player));
     payload.setPlayerBoard(player.getGameBoard());
@@ -96,7 +101,75 @@ public class BattleshipThread extends Thread {
     player.sendGameEvent(payload);
   }
 
+  public void sendGameMessage(String message) {
+    Payload payload = new Payload();
+    payload.setPayloadType(PayloadType.MESSAGE);
+    payload.setClientName("Game");
+    payload.setMessage(message);
+    for (ServerThread player : players) player.sendGameEvent(payload);
+    for (ServerThread spectator : spectators) spectator.sendGameEvent(payload);
+  }
+
   // private void sendGameEnd () {}
+
+  public void processCommand(ServerThread player, String command) {
+    String[] parts = command.split(" ");
+    switch(parts[0].toLowerCase()) {
+      case TURN -> {
+        if (phase.equals("placement"))  sendGameMessage(player, "The game is in the placement phase, it has not started yet");
+        else if (currentPlayer == player) sendGameMessage(player, "It is your turn");
+        else sendGameMessage(player, String.format("It is %s's turn", currentPlayer.getClientName()));
+      }
+      case BOARD -> {
+        if (player.getGameBoard() == null) sendGameMessage(player, "You have not placed your ships yet");
+        else sendGameMessage(player, player.getGameBoard().toString());
+      }
+      case BOARDS -> {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Boards: \n");
+        for (ServerThread p : players) {
+          if (p == null) continue;
+          sb.append(p.getGameBoard().getProtectedCopy().toString()).append("  ");
+          for (int i = 0; i < 30; i++) sb.append("-");
+          sb.append("\n");
+        }
+        sendGameMessage(player, sb.toString());
+      }
+      case PLAYERS -> {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Players: ");
+        for (ServerThread p : players) {
+          if (p == null) continue;
+          sb.append("\n  - ").append(p.getClientName());
+        }
+        sendGameMessage(player, sb.toString());
+      }
+      case SPECTATORS -> {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Spectators: ");
+        for (ServerThread spec : spectators) {
+          if (spec == null) continue;
+          sb.append("\n  - ").append(spec.getClientName());
+        }
+        sendGameMessage(player, sb.toString());
+      }
+      case GAME -> sendGameMessage(player, String.format("You are in room: %s, playing game: %s, which is currerntly in: %s phase", room.getName(), this.threadId(), phase));
+      case LEAVE_GAME -> {
+        if (players.contains(player)) {
+          sendGameMessage(player, "You have left the game");
+          removePlayer(player);
+          sendGameMessage(player.getClientName() + " has left the game");
+        } else if (spectators.contains(player)) {
+          sendGameMessage(player, "You are no longer spectating the game");
+          removeSpectator(player);
+          sendGameMessage(player.getClientName() + " has stopped spectating the game");
+        } else {
+          sendGameMessage(player, "You are not in the game");
+        }
+      }
+      default -> sendGameMessage(player, "Invalid command");
+    }
+  }
 
   public void processPayload(ServerThread player, Payload payload) {
     switch (payload.getPayloadType()) {
@@ -363,7 +436,8 @@ public class BattleshipThread extends Thread {
   }
 }
 
-class countDown { // Yes, i know best practice is for a new file, but nothing else will use it
+// Yes, i know best practice is for a new file, but nothing else will use it
+class countDown { //? implement auto-closeable?
   private final Runnable lambda1;
   private final Runnable lambda2;
   private final int timeoutSeconds;
@@ -393,9 +467,9 @@ class countDown { // Yes, i know best practice is for a new file, but nothing el
   public long getTimeRemaining() { return timeRemaining; }
 
   private void printTimer() {
-    if (timeRemaining < 10) System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_RED + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET);
-    else if (timeRemaining < 30) System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET);
-    else System.out.print( '\r' + BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "   ");
+    if (timeRemaining < 10) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_RED + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + "  \r");
+    else if (timeRemaining < 30) System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_YELLOW + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + '\r');
+    else System.out.print(BattleshipThread.ANSI_RESET + BattleshipThread.ANSI_GRAY + "Time remaining: " + timeRemaining + BattleshipThread.ANSI_RESET + '\r');
   }
 
   public void runLambdas() {

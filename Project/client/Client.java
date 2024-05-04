@@ -36,6 +36,8 @@ public class Client {
       /connect localhost:[port] - Connect to a server on localhost
       /disconnect - Disconnect from the server
       
+      /name - see your current username
+      /name [username] - Set or change username
       /rename [username] - Set or change username
       /users - List users in the chat
       
@@ -44,27 +46,32 @@ public class Client {
       /joinroom [room name] - Join a private room
       /leaveroom - Leave a private room (to Lobby)
       /rooms - List all available rooms
+      /room - Show the room you are currently in
       
-      /play - Start a game (open to everyone)
-      /play @[username] - Start a game with a user
+      /creategame - Start a game (open to everyone)
+      /creategame @[username] - Start a game with a user
       /games - List all currently active games
       
       /clear - Clear the console
       /quit - Exit the program
-      /help - Show this help message
-      """;
+      /help - Show this help message""";
   private static final String GAME_HELP = """
+      /turn - Show whose turn it is
       /attack @[player] [column] [row] - Attack a position on the board of that player
       /place [ship] [column] [row] [direction] - Place a ship on your board
           note: with one end at the location provided, direction = 'up', 'down', 'left', 'right'
-      /ships - List the ships you have left to place
-      /board - Show your board
 
-      /spectate - Stop playing and watch the game instead
-      /clear - Clear the console
-      /quit - Exit the program
-      /help - Show this help message
-      """;
+      /board - Show your board
+      /ships - List the ships you have left to place
+      /boards - Show all player's boards
+      /players - Show all players in the game
+      /spectators - Show all spectators in the game
+
+      /game - Show the game you are currently in
+      /leavegame - Leave the game
+      /spectate - Stop playing and watch the game instead 
+
+      /help - Show this help message"""; //! STILL HAVE TO ADD /SPECTATE
 
 
   boolean isRunning = false;
@@ -143,7 +150,7 @@ public class Client {
           system_error("Invalid connection command");
           return true;
         }
-        if (clientName.isBlank()) system_print("You can set your name by using: /name your_name");
+        if (clientName.isBlank()) system_print("You can set your name by using: /name [username]");
         String[] connectionParts = parts[1].split(":");
         connect(connectionParts[0].trim(), Integer.parseInt(connectionParts[1].trim()));
         return true;
@@ -151,17 +158,21 @@ public class Client {
         isRunning = false;
         return true;
       case "/name", "/rename":
-        if (parts.length != 2) {
-          system_error("Invalid name command");
-          return true;
-        }
         if (isConnected()) return false;
-        clientName = parts[1];
-        system_print("Name set to: " + clientName);
+        if (parts.length == 1) {
+          if (clientName.isBlank()) system_print("You have not set a name, use: /name [username]");
+          else system_print("Your name is: " + clientName);
+        } else {
+          clientName = parts[1];
+          system_print("Name set to: " + clientName);
+        }
         return true;
+      case "/allhelp":
+        system_print(inGame ? HELP : GAME_HELP);
       case "/help":
         if (inGame) system_print(GAME_HELP);
         else system_print(HELP);
+        system_print("/allhelp - Show all server commands / help messages\n");
         return true;
       case "/clear":
         System.out.print(UNIX_CLEAR);
@@ -175,7 +186,7 @@ public class Client {
         }
         sendGameEvent(PayloadType.GAME_START, parts[1]);
         return true;
-      case "/ships", "/board", "/place", "/attack":
+      case "/ships", "/place", "/attack":
         return processGameCommands(parts);
     }
     return false;
@@ -187,18 +198,12 @@ public class Client {
       case "/ships":
       printShips();
       return true;
-    case "/board":
-      System.out.print(this.playerBoard.toString());
-      return true;
     case "/place":
       placeShips(parts);
       return true;
     case "/attack":
-      if (parts.length != 4) {
-        system_error("Invalid attack command");
-      } else {
-        attackPlayer(parts[1].substring(1), Integer.parseInt(parts[3]), Integer.parseInt(parts[2]));
-      }
+      if (parts.length != 4) system_error("Invalid attack command");
+      else attackPlayer(parts[1].substring(1), Integer.parseInt(parts[3]), Integer.parseInt(parts[2]));
       return true;
     }
     return false;
@@ -412,7 +417,10 @@ public class Client {
   private void processMessage(Payload p) {
     switch (p.getPayloadType()) {
       case CONNECT, DISCONNECT -> system_print(String.format("*%s %s*", p.getClientName(), p.getMessage()));
-      case MESSAGE -> server_print(String.format("%s: %s", p.getClientName(), p.getMessage()));
+      case MESSAGE -> {
+        if (p.isRename()) this.clientName = p.getMessage().split(" ")[p.getMessage().split(" ").length - 1];
+        server_print(String.format("%s: %s", p.getClientName(), p.getMessage()));
+      }
       case GAME_PLACE -> {
         system_print("Game started with " + p.getNumber() + " players");
         inGame = true;
@@ -432,21 +440,6 @@ public class Client {
         this.coordinates = new HashMap<>();
         this.playerBoard = p.getPlayerBoard();
         this.opponentBoards = p.getOpponentBoardsMap();
-
-        System.out.print(String.format("""
-
-
-            The payloads's gameboard is:
-            %s
-
-            The player's gameboard is:
-            %s
-
-            The first opponent's gameboard is:
-            %s
-
-            
-            """, p.getPlayerBoard().toString(), this.playerBoard.toString(), p.getOpponentBoards()[0].toString()));
 
         drawGame(p.getPlayerBoard(), p.getOpponentBoards(), p.getMessage());
       }

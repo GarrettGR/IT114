@@ -12,10 +12,11 @@ public class ServerThread extends Thread {
   private boolean isRunning = false;
   private ObjectOutputStream out;
   private Room currentRoom;
-  private GameBoard gameBoard = new GameBoard();
+  volatile private GameBoard gameBoard = new GameBoard();
   private boolean isAway = false;
   private boolean isReady = false;
   private boolean isTurn = false;
+  private boolean inGame = false;
   private boolean isSpectator = false;
   
 
@@ -28,14 +29,20 @@ public class ServerThread extends Thread {
   }
 
   protected void setClientName(String name) {
+    Payload payload = new Payload();
+    payload.setPayloadType(PayloadType.MESSAGE);
+    payload.setRename(true);
+    payload.setClientName("Server");
     if (name == null || name.isBlank() || currentRoom.isTakenName(name) || name.equalsIgnoreCase("Server") || name.equalsIgnoreCase("null") || name.equalsIgnoreCase("Lobby")) {
       System.err.println("Invalid client name being set");
-      sendMessage("Server", "Invalid name chosen, auto-generating name");
+      payload.setMessage(name + " is an invalid name. Auto-generating name.");
       name = createClientName();
+    } else {
+      payload.setMessage("Your name is: " + name);
     }
     this.clientName = name;
     this.gameBoard.setClientName(name);
-
+    send(payload);
   }
 
   protected String getClientName() { return clientName; }
@@ -48,27 +55,32 @@ public class ServerThread extends Thread {
   }
 
   protected synchronized void setGameBoard(GameBoard board) { 
-    gameBoard = board; 
+    // gameBoard = board; // This is a shallow copy -- is this okay?
+    gameBoard.setBoard(board.getBoard());
     gameBoard.setClientName(clientName);
   }
 
-  protected GameBoard getGameBoard() { return gameBoard; }
+  protected synchronized GameBoard getGameBoard() { return this.gameBoard; }
+
+  protected boolean inGame() { return inGame; }
+
+  protected void inGame(boolean inGame) { this.inGame = inGame; }
 
   protected boolean isAway() { return isAway; }
 
-  protected void setAway(boolean away) { isAway = away; }
+  protected void isAway(boolean isAway) { this.isAway = isAway; }
 
   protected boolean isReady() { return isReady; }
 
-  protected void setReady(boolean ready) { isReady = ready; }
+  protected void isReady(boolean isReady) { this.isReady = isReady; }
 
   protected boolean isTurn() { return isTurn; }
 
-  protected void setTurn(boolean turn) { isTurn = turn; }
+  protected void isTurn(boolean isTurn) { this.isTurn = isTurn; }
 
   protected boolean isSpectator() { return isSpectator; }
 
-  protected void setSpectator(boolean spectator) { isSpectator = spectator; }
+  protected void isSpectator(boolean isSpectator) { this.isSpectator = isSpectator; }
 
   public void disconnect() {
     info("Thread being disconnected by server");
@@ -85,8 +97,7 @@ public class ServerThread extends Thread {
   }
 
   public void sendGameEvent(Payload p) {
-    System.out.println("Sending game event: " + p);
-    System.out.println("Sending to room: " + currentRoom.getName());
+    System.out.println("Sending game event: " + p + "\n to room: " + currentRoom.getName());
     send(p);
   }
 
@@ -133,10 +144,7 @@ public class ServerThread extends Thread {
       this.out = out;
       isRunning = true;
       Payload fromClient;
-      while (isRunning && (fromClient = (Payload) in.readObject()) != null) {
-        info("Received: " + fromClient);
-        processMessage(fromClient);
-      }
+      while (isRunning && (fromClient = (Payload) in.readObject()) != null) processMessage(fromClient);
     } catch (Exception e) {
       e.printStackTrace();
       info("Client disconnected");
@@ -148,6 +156,7 @@ public class ServerThread extends Thread {
   }
 
   void processMessage(Payload p) {
+    info("Received: " + p);
     switch (p.getPayloadType()) {
       case CONNECT -> setClientName(p.getClientName());
       case DISCONNECT -> disconnect();
