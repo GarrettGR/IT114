@@ -18,14 +18,17 @@ public class Payload implements Serializable {
 
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>(); // Username, GameBoard
+  private Map<String, Player> players = new HashMap<>(); // Username, Player
   private List<Ship> ships = new ArrayList<>();
   private Map<String,  List<Integer[]>> coordinates = new HashMap<>(); // Username, coordinates
-  
-  // Overloaded setters and getters is a little overkill... but I also kept wanting to deal with them slightly differently in different places... hopefully no weird errors come from this...
 
+  // --- PayloadType (enum) ---
+  
   public PayloadType getPayloadType() { return payloadType; }
 
   public void setPayloadType(PayloadType payloadType) { this.payloadType = payloadType; }
+
+  // --- Primitive Types ---
 
   public String getClientName() { return clientName; }
 
@@ -51,9 +54,13 @@ public class Payload implements Serializable {
 
   public boolean isGameOver() { return isGameOver; }
 
+  // --- GameBoard (player) ---
+
   public void setPlayerBoard(GameBoard board) { this.playerBoard.setBoard(board); }
 
   public GameBoard getPlayerBoard() { return playerBoard; }
+
+  // --- Opponent Boards ---
 
   public void addOpponentBoard(String key, GameBoard board) { this.opponentBoards.put(key, board); }
 
@@ -67,6 +74,22 @@ public class Payload implements Serializable {
 
   public GameBoard getOpponentBoard(String key) { return opponentBoards.get(key); }
 
+  // --- Players ---
+
+  public void addPlayer(String key, Player player) { this.players.put(key, player); }
+
+  public void setPlayers(Map<String, Player> players) { this.players = players; }
+
+  public Map<String, Player> getPlayers() { return players; }
+
+  public Player[] getPlayersArray() { return players.values().toArray(Player[]::new); }
+
+  public List<Player> getPlayersList() { return new ArrayList<>(players.values()); }
+
+  public Player getPlayer(String key) { return players.get(key); }
+
+  // --- Ships ---
+
   public void addShip(Ship ship) { this.ships.add(ship); }
 
   public void setShips(List<Ship> ships) { this.ships = ships; }
@@ -78,6 +101,8 @@ public class Payload implements Serializable {
   public List<Ship> getShipList() { return ships; }
 
   public Ship getShip(int index) { return ships.get(index); }
+
+  // --- Coordinates ---
 
   public void setCoordinates(Map<String, List<Integer[]>> coordinates) { this.coordinates = coordinates; }
 
