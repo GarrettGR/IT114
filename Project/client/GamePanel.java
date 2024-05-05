@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
-public class GamePanel extends JPanel {
+public class GamePanel extends JPanel { // Change to JSplitPane?
   private List<GameBoard> boards = new ArrayList<>();
 
   public GamePanel(List<GameBoard> boards) {

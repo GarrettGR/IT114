@@ -8,6 +8,8 @@ public class PlayerData implements Serializable{
     private int misses;
     private int score ;
     private int currency;
+    private boolean isTurn = false;
+    private boolean isAway = false;
 
     // Should include the GameBoard in the future...
 
@@ -35,9 +37,17 @@ public class PlayerData implements Serializable{
       this.currency = player.getCurrency();
     }
 
-    public Integer[] getStats() {
-      return new Integer[] {health, hits, misses, score, currency};
-    }
+    // --- Other ---
+
+    public Integer[] getStats() { return new Integer[] {health, hits, misses, score, currency, isAway ? 1 : 0, isTurn ? 1 : 0}; }
+
+    public synchronized void isAway(boolean isAway) { this.isAway = isAway; }
+
+    public synchronized boolean isAway() { return isAway; }
+
+    public synchronized void isTurn(boolean isTurn) { this.isTurn = isTurn; }
+
+    public synchronized boolean isTurn() { return isTurn; }
 
     // --- Scores ---
 
@@ -95,6 +105,6 @@ public class PlayerData implements Serializable{
 
     @Override
     public String toString() {
-      return String.format("%d points, %d health, %d hits, %d misses, %d currency", score, health, hits, misses, currency);
+      return String.format("%d points, %d health, %d hits, %d misses, %d currency, isAway: %b, isTurn %b", score, health, hits, misses, currency, isAway, isTurn);
     }
 }

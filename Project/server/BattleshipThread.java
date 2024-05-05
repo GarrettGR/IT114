@@ -510,6 +510,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     }
 
     sendGameMessage("The game has ended, thanks for playing!");
+    cleanup();
 
   }
 

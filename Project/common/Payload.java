@@ -92,6 +92,8 @@ public class Payload implements Serializable {
       player.setMisses(entry.getValue()[2]);
       player.setScore(entry.getValue()[3]);
       player.setCurrency(entry.getValue()[4]);
+      player.isTurn(entry.getValue()[5] == 1);
+      player.isAway(entry.getValue()[6] == 1);
       this.playerData.put(entry.getKey(), player);
     }
   }
