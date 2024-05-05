@@ -80,7 +80,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     payload.setMessage(message);
     payload.setNumber((long) (players.size() - 1));
     // payload.setPlayerData(getPlayerMap(players));
-    for (ServerThread p : players.keySet()) payload.addPlayerData(p.getClientName(), players.get(p));
+    payload.setPlayerDataWithList(getPlayerMapWithList(players));
     for (ServerThread p : players.keySet()) { 
       if (p == null) continue;
       if (p == currentPlayer) payload.setTurn(true);
@@ -302,6 +302,12 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private synchronized Map<String, PlayerData> getPlayerMap(Map<ServerThread, PlayerData> p) {
     Map<String, PlayerData> playerdata = new HashMap<>();
     for (ServerThread player : p.keySet()) playerdata.put(player.getClientName(), p.get(player));
+    return playerdata;
+  }
+
+  private synchronized Map<String, Integer[]> getPlayerMapWithList(Map<ServerThread, PlayerData> p) {
+    Map<String, Integer[]> playerdata = new HashMap<>();
+    for (Map.Entry<ServerThread, PlayerData> entry : p.entrySet()) playerdata.put(entry.getKey().getClientName(), entry.getValue().getStats());
     return playerdata;
   }
 

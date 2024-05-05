@@ -3,10 +3,10 @@ package Project.common;
 import java.io.Serializable;
 
 public class PlayerData implements Serializable{
-    private int score ;
     private int health;
     private int hits;
     private int misses;
+    private int score ;
     private int currency;
 
     // Should include the GameBoard in the future...
@@ -19,11 +19,11 @@ public class PlayerData implements Serializable{
       this.currency = 0;
     }
 
-    public PlayerData(int score, int health, int hits, int misses, int currency) {
-      this.score = score;
+    public PlayerData(int health, int hits, int misses, int score, int currency) {
       this.health = health;
       this.hits = hits;
       this.misses = misses;
+      this.score = score;
       this.currency = currency;
     }
 
@@ -33,6 +33,10 @@ public class PlayerData implements Serializable{
       this.hits = player.getHits();
       this.misses = player.getMisses();
       this.currency = player.getCurrency();
+    }
+
+    public Integer[] getStats() {
+      return new Integer[] {health, hits, misses, score, currency};
     }
 
     // --- Scores ---

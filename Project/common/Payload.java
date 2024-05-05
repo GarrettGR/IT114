@@ -85,6 +85,17 @@ public class Payload implements Serializable {
 
   public synchronized void setPlayerData(Map<String, PlayerData> players) { this.playerData = players; }
 
+  public synchronized void setPlayerDataWithList(Map<String, Integer[]> players) { 
+    for (Map.Entry<String, Integer[]> entry : players.entrySet()) {
+      PlayerData player = new PlayerData(entry.getValue()[0]);
+      player.setHits(entry.getValue()[1]);
+      player.setMisses(entry.getValue()[2]);
+      player.setScore(entry.getValue()[3]);
+      player.setCurrency(entry.getValue()[4]);
+      this.playerData.put(entry.getKey(), player);
+    }
+  }
+
   public synchronized Map<String, PlayerData> getPlayerDataMap() { return playerData; }
 
   public synchronized PlayerData getPlayerData(String key) { return playerData.get(key); }
