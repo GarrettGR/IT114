@@ -22,6 +22,8 @@ public class Client {
 
   public static final String ANSI_RESET = "\u001B[0m";
   public static final String ANSI_YELLOW = "\u001B[33m";
+  public static final String ANSI_GREEN = "\u001B[32m";
+  public static final String ANSI_ORANGE = "\u001B[38;2;255;165;0m";
   public static final String ANSI_RED = "\u001B[31m";
   public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
   public static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
@@ -114,27 +116,26 @@ public class Client {
   // --- Start of Formatters ---
 
   public static void server_print(String message) {
-    if (message.startsWith("Server:")) {
-      System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
-    } else {
-      System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
-    }
+    if (message.startsWith("Server:")) System.out.print(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET + "\n");
+    else if (message.startsWith("Game:") || message.startsWith("Room:")) System.out.print(ANSI_GRAY_BG + ANSI_ORANGE + message + ANSI_RESET + "\n");
+    else System.out.print(ANSI_GRAY_BG + message + ANSI_RESET + "\n");
   }
 
-  public static void system_print(String message) { System.out.println(ANSI_YELLOW + message + ANSI_RESET); }
+  public static void system_print(String message) { System.out.print(ANSI_YELLOW + message + ANSI_RESET + "\n"); }
 
-  public static void system_error(String message) { System.out.println(ANSI_RED + message + ANSI_RESET); }
+  public static void system_error(String message) { System.out.print(ANSI_RED + message + ANSI_RESET + "\n"); }
 
   public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
 
   private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards, String message) {
-    System.out.print(UNIX_CLEAR);
     for (GameBoard board : opponentBoards) {
       System.out.print(board.toString() + "  ");
       for (int i = 0; i < 30; i++) game_print("-");
       System.out.println();
+      System.out.println(String.format("%s statistics: %s", board.getClientName(), playerdata.get(board.getClientName().substring(0, board.getClientName().length() - 2)).toString()));
     }
     System.out.print(playerBoard.toString());
+    System.out.println(String.format("%s statistics: %s", playerBoard.getClientName(), playerdata.get(this.clientName)));
     system_print(message);
   }
 

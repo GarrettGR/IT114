@@ -10,6 +10,7 @@ public class Payload implements Serializable {
   private static final long serialVersionUID = 1L;
   private PayloadType payloadType;
   private String clientName;
+  private String roomName;
   private String message;
   private long number;
   private boolean isTurn = false;
@@ -37,6 +38,10 @@ public class Payload implements Serializable {
   public String getMessage() { return message; }
 
   public void setMessage(String message) { this.message = message; }
+
+  public String getRoomName() { return roomName; }
+
+  public void setRoomName(String roomName) { this.roomName = roomName; }
 
   public long getNumber() { return number; }
 
@@ -122,11 +127,13 @@ public class Payload implements Serializable {
 
   @Override
   public String toString() {
+    String ANSI_RESET = "\u001B[0m";
     return String.format(
-      "Type[%s], Number[%s], Message[%s], Name[%s], Rename[%s], PlayerBoard[%s], PlayerData[%s], OpponentBoard[%s], ships[%s], Coords[%s]",
+      "Type[%s], Number[%s], Message[%s%s], Name[%s], Rename[%s], PlayerBoard[%s], PlayerData[%s], OpponentBoard[%s], ships[%s], Coords[%s]",
       getPayloadType().toString(),
       getNumber(), 
       getMessage(), 
+      ANSI_RESET,
       getClientName(), 
       isRename(), 
       getPlayerBoard() != null ? "true" : "false", 

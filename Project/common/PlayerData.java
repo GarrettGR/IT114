@@ -11,7 +11,7 @@ public class PlayerData implements Serializable{
 
     // Should include the GameBoard in the future...
 
-    public PlayerData( int health) {
+    public PlayerData(int health) {
       this.score = 0;
       this.health = health;
       this.hits = 0;
