@@ -9,7 +9,7 @@ import java.awt.event.*;
 import javax.swing.*;
 
 public class UserPanelContainer extends JPanel {
-  ArrayList<UserPanel> userPanels = new ArrayList<>();
+  protected ArrayList<UserPanel> userPanels = new ArrayList<>();
 
   public UserPanelContainer(HashMap<String, PlayerData> playerData) {
     
@@ -28,9 +28,20 @@ public class UserPanelContainer extends JPanel {
     }
   }
 
+  protected void updateUserPanels(HashMap<String, PlayerData> playerData) {
+    for (UserPanel userPanel : userPanels) {
+      PlayerData player = playerData.get(userPanel.getName());
+      userPanel.setHealth(player.getHealth());
+      userPanel.setPoints(player.getScore());
+      userPanel.setCurrency(player.getCurrency());
+      userPanel.setAccuracy(player.getHits(), player.getMisses());
+    }
+  }
 }
 
 class UserPanel extends JPanel {
+  private boolean infoPanelVisible = false;
+  private int preferedWidth;
   private JLabel nameLabel;
   private JLabel healthLabel;
   private JPanel statusPanel;
@@ -39,12 +50,13 @@ class UserPanel extends JPanel {
   private JLabel accuracyLabel;
   private JLabel pointsLabel;
   private JLabel currencyLabel;
+  private JPanel namePanel;
   private JPanel infoPanel;
-  private boolean infoPanelVisible;
 
   public UserPanel(String name) {
     setLayout(new BorderLayout());
     add(Box.createVerticalGlue());
+    setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
 
     nameLabel = new JLabel(name);
     healthLabel = new JLabel("Health: 0");
@@ -56,16 +68,15 @@ class UserPanel extends JPanel {
     pointsLabel = new JLabel("Points: 0");
     currencyLabel = new JLabel("Currency: 0");
     infoPanel = new JPanel();
+    namePanel = new JPanel();
 
     infoPanel.setLayout(new GridLayout(5, 1));
-    infoPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+    infoPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, -10));
     infoPanel.add(hitsLabel);
     infoPanel.add(missesLabel);
     infoPanel.add(accuracyLabel);
     infoPanel.add(pointsLabel);
     infoPanel.add(currencyLabel);
-
-    JPanel namePanel = new JPanel();
 
     namePanel.setLayout(new GridBagLayout());
     GridBagConstraints gbc = new GridBagConstraints();
@@ -105,7 +116,6 @@ class UserPanel extends JPanel {
       }
     });
     
-    infoPanelVisible = false;
     infoPanel.setVisible(infoPanelVisible);
   }
 

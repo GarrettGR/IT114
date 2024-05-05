@@ -19,6 +19,7 @@ public class Client {
   Socket server = null;
   ObjectOutputStream out = null;
   ObjectInputStream in = null;
+  GUI gui = null;
 
   public static final String ANSI_RESET = "\u001B[0m";
   public static final String ANSI_YELLOW = "\u001B[33m";
@@ -91,7 +92,10 @@ public class Client {
 
   // --- Start of Boilerplate ---
 
-  public Client() { system_print("Client Created"); }
+  public Client() { 
+    this.gui = new GUI(this);
+    system_print("Client Created"); 
+  }
 
   public void start() throws IOException { listenForKeyboard(); }
 
@@ -115,17 +119,33 @@ public class Client {
 
   // --- Start of Formatters ---
 
-  public static void server_print(String message) {
-    if (message.startsWith("Server:")) System.out.print(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET + "\n");
-    else if (message.startsWith("Game:") || message.startsWith("Room:")) System.out.print(ANSI_GRAY_BG + ANSI_ORANGE + message + ANSI_RESET + "\n");
-    else System.out.print(ANSI_GRAY_BG + message + ANSI_RESET + "\n");
+  public void server_print(String message) {
+    if (message.startsWith("Server:")) {
+      System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
+      gui.ingestMessage(message);
+    } else if (message.startsWith("Game:") || message.startsWith("Room:")) { 
+      System.out.println(ANSI_GRAY_BG + ANSI_ORANGE + message + ANSI_RESET);
+      gui.ingestMessage(message);
+    } else { 
+      System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
+      gui.ingestMessage(message);
+    }
   }
 
-  public static void system_print(String message) { System.out.print(ANSI_YELLOW + message + ANSI_RESET + "\n"); }
+  public void system_print(String message) { 
+    System.out.println(ANSI_YELLOW + message + ANSI_RESET); 
+    gui.ingestMessage(message);
+  }
 
-  public static void system_error(String message) { System.out.print(ANSI_RED + message + ANSI_RESET + "\n"); }
+  public void system_error(String message) { 
+    System.out.println(ANSI_RED + message + ANSI_RESET); 
+    gui.ingestMessage(message);
+  }
 
-  public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
+  public void game_print(String message) { 
+    System.out.print(ANSI_GRAY + message + ANSI_RESET);
+    gui.ingestMessage(message);
+  }
 
   private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards, String message) {
     for (GameBoard board : opponentBoards) {
@@ -256,7 +276,7 @@ public class Client {
         placedShips.add(ship);
         system_print("Placed " + ship.getType().getName() + " at " + y + ", " + x + " facing " + parts[4]);
         ships.remove(ship);
-        System.out.print(playerBoard.toString());
+        system_print(playerBoard.toString());
         break;
       }
     }
@@ -350,6 +370,16 @@ public class Client {
     }
   }
 
+  protected void handleMessage(String line) throws IOException {
+    if (!processCommand(line)) {
+      if (isConnected()) {
+        if (line != null && line.trim().length() > 0) sendMessage(line);
+      } else {
+        system_error("Not connected to server");
+      }
+    }
+  }
+
   private void listenForKeyboard() {
     inputThread = new Thread() {
       @Override
@@ -361,13 +391,7 @@ public class Client {
           while (isRunning) {
             try {
               line = si.nextLine();
-              if (!processCommand(line)) {
-                if (isConnected()) {
-                  if (line != null && line.trim().length() > 0) sendMessage(line);
-                } else {
-                  system_error("Not connected to server");
-                }
-              }
+              handleMessage(line);
             } catch (Exception e) {
               system_error("Connection dropped");
               break;
@@ -430,7 +454,7 @@ public class Client {
         ships = p.getShipList();
         playerBoard.setBoard(p.getPlayerBoard());
         playerBoard.setClientName("Your");
-        System.out.print(p.getMessage() + '\n' + playerBoard.toString());
+        server_print(p.getMessage() + '\n' + playerBoard.toString());
         printShips();
       }
       case GAME_STATE -> {
