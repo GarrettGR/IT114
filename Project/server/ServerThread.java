@@ -144,7 +144,7 @@ public class ServerThread extends Thread {
       this.out = out;
       isRunning = true;
       Payload fromClient;
-      while (isRunning && (fromClient = (Payload) in.readObject()) != null) processMessage(fromClient);
+      while (isRunning && (fromClient = (Payload) in.readObject()) != null) processPayload(fromClient);
     } catch (Exception e) {
       e.printStackTrace();
       info("Client disconnected");
@@ -155,7 +155,7 @@ public class ServerThread extends Thread {
     }
   }
 
-  void processMessage(Payload p) {
+  void processPayload(Payload p) {
     info("Received: " + p);
     switch (p.getPayloadType()) {
       case CONNECT -> setClientName(p.getClientName());

@@ -18,7 +18,7 @@ public class Payload implements Serializable {
 
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>(); // Username, GameBoard
-  private Map<String, Player> players = new HashMap<>(); // Username, Player
+  private Map<String, PlayerData> playerData = new HashMap<>(); // Username, Player
   private List<Ship> ships = new ArrayList<>();
   private Map<String,  List<Integer[]>> coordinates = new HashMap<>(); // Username, coordinates
 
@@ -74,19 +74,20 @@ public class Payload implements Serializable {
 
   public GameBoard getOpponentBoard(String key) { return opponentBoards.get(key); }
 
-  // --- Players ---
+  // --- PlayerData ---
 
-  public void addPlayer(String key, Player player) { this.players.put(key, player); }
+  public void addPlayerData(String key, PlayerData player) { this.playerData.put(key, player); }
 
-  public void setPlayers(Map<String, Player> players) { this.players = players; }
+  public void setPlayerData(Map<String, PlayerData> players) { this.playerData = players; }
 
-  public Map<String, Player> getPlayers() { return players; }
+  public Map<String, PlayerData> getPlayerDataMap() { return playerData; }
 
-  public Player[] getPlayersArray() { return players.values().toArray(Player[]::new); }
+  public PlayerData getPlayerData(String key) { return playerData.get(key); }
 
-  public List<Player> getPlayersList() { return new ArrayList<>(players.values()); }
+  public PlayerData[] getPlayerDataArray() { return playerData.values().toArray(PlayerData[]::new); }
 
-  public Player getPlayer(String key) { return players.get(key); }
+  public List<PlayerData> getPlayerDataList() { return new ArrayList<>(playerData.values()); }
+
 
   // --- Ships ---
 
@@ -121,6 +122,17 @@ public class Payload implements Serializable {
 
   @Override
   public String toString() {
-    return String.format("Type[%s], Number[%s], Message[%s], Name[%s], Rename[%s], PlayerBoard[%s], OpBoard[%s], ships[%s], Coords[%s]", getPayloadType().toString(), getNumber(), getMessage(), getClientName(), isRename(), getPlayerBoard() != null ? "true" : "false", getOpponentBoards() != null && !getOpponentBoardsList().isEmpty() ? "true" : "false", getShips() != null && !getShipList().isEmpty() ? "true" : "false", getCoordinates() != null && !getCoordinates().isEmpty() ? "true" : "false");
+    return String.format(
+      "Type[%s], Number[%s], Message[%s], Name[%s], Rename[%s], PlayerBoard[%s], PlayerData[%s], OpponentBoard[%s], ships[%s], Coords[%s]",
+      getPayloadType().toString(),
+      getNumber(), 
+      getMessage(), 
+      getClientName(), 
+      isRename(), 
+      getPlayerBoard() != null ? "true" : "false", 
+      getPlayerDataList() != null || !getPlayerDataList().isEmpty() ? "true" : "false" , 
+      getOpponentBoards() != null && !getOpponentBoardsList().isEmpty() ? "true" : "false", 
+      getShips() != null && !getShipList().isEmpty() ? "true" : "false", 
+      getCoordinates() != null && !getCoordinates().isEmpty() ? "true" : "false");
   }
 }

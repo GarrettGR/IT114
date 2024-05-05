@@ -22,7 +22,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private countDown counterTimer;
   private ServerThread currentPlayer; //? make this volatile?
 
-  private Map<ServerThread, Player> players = new HashMap<>();
+  private Map<ServerThread, PlayerData> players = new HashMap<>();
   private Iterator<ServerThread> playerIterator;
   private List<ServerThread> spectators = new ArrayList<>();
 
@@ -64,7 +64,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     this.room = room;
     playerIterator = players.keySet().iterator();
     printGameInfo("Battleship game thread created");
-    counterTimer = new countDown(() -> { placementPhase(); }, playerCount < 4 ? playerCount : 4, 180);
+    counterTimer = new countDown(() -> { placementPhase(); }, playerCount < 4 ? playerCount : 4, 256);
   }
 
   protected static void printGameInfo(String message) { System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET); }
@@ -75,7 +75,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     payload.setClientName("Game"); //? should this be the client/player name?
     payload.setMessage(message);
     payload.setNumber((long) (players.size() - 1));
-    payload.setPlayers(getPlayerMap(players));
+    payload.setPlayerData(getPlayerMap(players));
     for (ServerThread p : players.keySet()) { 
       if (p == null) continue;
       if (p == currentPlayer) payload.setTurn(true);
@@ -252,7 +252,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     if (!started) {
       int health = 0;
       for (int shipHealth : shipCounts.values()) health += shipHealth;
-      Player tempPlayer = new Player(player.getClientName(), health);
+      PlayerData tempPlayer = new PlayerData(health);
       players.put(player, tempPlayer);
       counterTimer.decrement();
     }
@@ -287,11 +287,11 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     return null;
   }
 
-  private Player getPlayer(ServerThread player) { return players.get(player); }
+  private PlayerData getPlayer(ServerThread player) { return players.get(player); }
 
 
-  private Map<String, Player> getPlayerMap(Map<ServerThread, Player> p) {
-    Map<String, Player> players = new HashMap<>();
+  private Map<String, PlayerData> getPlayerMap(Map<ServerThread, PlayerData> p) {
+    Map<String, PlayerData> players = new HashMap<>();
     for (ServerThread player : p.keySet()) players.put(player.getClientName(), p.get(player));
     return players;
   }
@@ -375,13 +375,16 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private synchronized void handleAttack(ServerThread player, Map<String, List<Integer[]>> targetCoordinates) {
     if (currentPlayer == null) currentPlayer = player;
     if (player != currentPlayer) return;
-    Player attackingPlayer = getPlayer(player);
+    PlayerData attackingPlayer = getPlayer(player);
     printGameInfo(player.getClientName() + " is executing their attack (validated)");
+
+    printGameInfo(String.format("Player Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
+    printGameInfo(String.format("Initial statistics for %s: %s", player.getClientName(), attackingPlayer.toString()));
 
     for (String name : targetCoordinates.keySet()) {
       List<Integer[]> coordinates = targetCoordinates.get(name);
       GameBoard targetBoard = getPlayer(name).getGameBoard();
-      Player targetPlayer = getPlayer(getPlayer(name));
+      PlayerData targetPlayer = getPlayer(getPlayer(name));
       for (Integer[] coordinate : coordinates) {
         int x = coordinate[0];
         int y = coordinate[1];
@@ -400,13 +403,11 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
           sendGameState(player, PayloadType.MESSAGE, String.format("%s missed while targeting %s", player.getClientName(), name), String.format("Your shot at %s on %s, %s missed", name, y+1, x+1));
         }
         printGameInfo(String.format("Target Board for %s:\n%s", name, targetBoard.toString()));
-        printGameInfo(targetPlayer.toString());
+        printGameInfo(String.format("%s: %s", name, targetPlayer.toString()));
       }
-      printGameInfo(String.format("Player Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
-      printGameInfo(attackingPlayer.toString());
-
       counterTimer.decrement();
     }
+    printGameInfo(String.format("Final statistics for %s: %s", player.getClientName(), attackingPlayer.toString()));
   }
 
   @Override

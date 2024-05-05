@@ -85,6 +85,7 @@ public class Client {
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>();
   private Map<String, List<Integer[]>> coordinates = new HashMap<>();
+  private Map<String, PlayerData> playerdata = new HashMap<>();
 
   // --- Start of Boilerplate ---
 
@@ -388,7 +389,7 @@ public class Client {
       public void run() {
         try {
           Payload fromServer;
-          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processMessage(fromServer);
+          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processPayload(fromServer);
           system_error("Loop exited");
         } catch (Exception e) {
           e.printStackTrace();
@@ -415,7 +416,7 @@ public class Client {
     opponentBoards = new HashMap<>();
   }
 
-  private void processMessage(Payload p) {
+  private void processPayload(Payload p) {
     switch (p.getPayloadType()) {
       case CONNECT, DISCONNECT -> system_print(String.format("*%s %s*", p.getClientName(), p.getMessage()));
       case MESSAGE -> {
@@ -443,6 +444,7 @@ public class Client {
         this.playerBoard = new GameBoard(p.getPlayerBoard());
         this.playerBoard.setClientName("Your");
         this.opponentBoards = p.getOpponentBoardsMap();
+        this.playerdata = p.getPlayerDataMap();
 
         drawGame(this.playerBoard, p.getOpponentBoards(), p.getMessage());
       }
