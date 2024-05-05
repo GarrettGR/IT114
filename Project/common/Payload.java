@@ -25,98 +25,97 @@ public class Payload implements Serializable {
 
   // --- PayloadType (enum) ---
   
-  public PayloadType getPayloadType() { return payloadType; }
+  public synchronized PayloadType getPayloadType() { return payloadType; }
 
-  public void setPayloadType(PayloadType payloadType) { this.payloadType = payloadType; }
+  public synchronized void setPayloadType(PayloadType payloadType) { this.payloadType = payloadType; }
 
   // --- Primitive Types ---
 
-  public String getClientName() { return clientName; }
+  public synchronized String getClientName() { return clientName; }
 
-  public void setClientName(String clientName) { this.clientName = clientName; }
+  public synchronized void setClientName(String clientName) { this.clientName = clientName; }
 
-  public String getMessage() { return message; }
+  public synchronized String getMessage() { return message; }
 
-  public void setMessage(String message) { this.message = message; }
+  public synchronized void setMessage(String message) { this.message = message; }
 
-  public String getRoomName() { return roomName; }
+  public synchronized String getRoomName() { return roomName; }
 
-  public void setRoomName(String roomName) { this.roomName = roomName; }
+  public synchronized void setRoomName(String roomName) { this.roomName = roomName; }
 
-  public long getNumber() { return number; }
+  public synchronized long getNumber() { return number; }
 
-  public void setNumber(long number) { this.number = number; }
+  public synchronized void setNumber(long number) { this.number = number; }
 
-  public void setTurn(boolean isTurn) { this.isTurn = isTurn; }
+  public synchronized void setTurn(boolean isTurn) { this.isTurn = isTurn; }
 
-  public void setRename(boolean isRename) { this.isRename = isRename; }
+  public synchronized void setRename(boolean isRename) { this.isRename = isRename; }
 
-  public boolean isRename() { return isRename; }
+  public synchronized boolean isRename() { return isRename; }
 
-  public boolean isTurn() { return isTurn; }
+  public synchronized boolean isTurn() { return isTurn; }
 
-  public void setGameOver(boolean isGameOver) { this.isGameOver = isGameOver; }
+  public synchronized void setGameOver(boolean isGameOver) { this.isGameOver = isGameOver; }
 
-  public boolean isGameOver() { return isGameOver; }
+  public synchronized boolean isGameOver() { return isGameOver; }
 
   // --- GameBoard (player) ---
 
-  public void setPlayerBoard(GameBoard board) { this.playerBoard.setBoard(board); }
+  public synchronized void setPlayerBoard(GameBoard board) { this.playerBoard.setBoard(board); }
 
-  public GameBoard getPlayerBoard() { return playerBoard; }
+  public synchronized GameBoard getPlayerBoard() { return playerBoard; }
 
   // --- Opponent Boards ---
 
-  public void addOpponentBoard(String key, GameBoard board) { this.opponentBoards.put(key, board); }
+  public synchronized void addOpponentBoard(String key, GameBoard board) { this.opponentBoards.put(key, board); }
 
-  public void setOpponentBoards(Map<String, GameBoard> boards) { this.opponentBoards = boards; }
+  public synchronized void setOpponentBoards(Map<String, GameBoard> boards) { this.opponentBoards = boards; }
 
-  public Map<String, GameBoard> getOpponentBoardsMap() { return opponentBoards; }
+  public synchronized Map<String, GameBoard> getOpponentBoardsMap() { return opponentBoards; }
 
-  public GameBoard[] getOpponentBoards() { return opponentBoards.values().toArray(GameBoard[]::new); }
+  public synchronized GameBoard[] getOpponentBoards() { return opponentBoards.values().toArray(GameBoard[]::new); }
 
-  public List<GameBoard> getOpponentBoardsList() { return new ArrayList<>(opponentBoards.values()); }
+  public synchronized List<GameBoard> getOpponentBoardsList() { return new ArrayList<>(opponentBoards.values()); }
 
-  public GameBoard getOpponentBoard(String key) { return opponentBoards.get(key); }
+  public synchronized GameBoard getOpponentBoard(String key) { return opponentBoards.get(key); }
 
   // --- PlayerData ---
 
-  public void addPlayerData(String key, PlayerData player) { this.playerData.put(key, player); }
+  public synchronized void addPlayerData(String key, PlayerData player) { this.playerData.put(key, player); }
 
-  public void setPlayerData(Map<String, PlayerData> players) { this.playerData = players; }
+  public synchronized void setPlayerData(Map<String, PlayerData> players) { this.playerData = players; }
 
-  public Map<String, PlayerData> getPlayerDataMap() { return playerData; }
+  public synchronized Map<String, PlayerData> getPlayerDataMap() { return playerData; }
 
-  public PlayerData getPlayerData(String key) { return playerData.get(key); }
+  public synchronized PlayerData getPlayerData(String key) { return playerData.get(key); }
 
-  public PlayerData[] getPlayerDataArray() { return playerData.values().toArray(PlayerData[]::new); }
+  public synchronized PlayerData[] getPlayerDataArray() { return playerData.values().toArray(PlayerData[]::new); }
 
-  public List<PlayerData> getPlayerDataList() { return new ArrayList<>(playerData.values()); }
-
+  public synchronized List<PlayerData> getPlayerDataList() { return new ArrayList<>(playerData.values()); }
 
   // --- Ships ---
 
-  public void addShip(Ship ship) { this.ships.add(ship); }
+  public synchronized void addShip(Ship ship) { this.ships.add(ship); }
 
-  public void setShips(List<Ship> ships) { this.ships = ships; }
+  public synchronized void setShips(List<Ship> ships) { this.ships = ships; }
 
-  public void setShips(Ship[] ships) { this.ships = List.of(ships); }
+  public synchronized void setShips(Ship[] ships) { this.ships = List.of(ships); }
 
-  public Ship[] getShips() { return ships.toArray(Ship[]::new); }
+  public synchronized Ship[] getShips() { return ships.toArray(Ship[]::new); }
 
-  public List<Ship> getShipList() { return ships; }
+  public synchronized List<Ship> getShipList() { return ships; }
 
-  public Ship getShip(int index) { return ships.get(index); }
+  public synchronized Ship getShip(int index) { return ships.get(index); }
 
   // --- Coordinates ---
 
-  public void setCoordinates(Map<String, List<Integer[]>> coordinates) { this.coordinates = coordinates; }
+  public synchronized void setCoordinates(Map<String, List<Integer[]>> coordinates) { this.coordinates = coordinates; }
 
-  public Map<String, List<Integer[]>> getCoordinates() { return coordinates; }
+  public synchronized Map<String, List<Integer[]>> getCoordinates() { return coordinates; }
 
-  public List<Integer[]> getCoordinates(String key) { return coordinates.get(key); }
+  public synchronized List<Integer[]> getCoordinates(String key) { return coordinates.get(key); }
 
-  public void addCoordinate(String key, Integer[] coordinate) { 
+  public synchronized void addCoordinate(String key, Integer[] coordinate) { 
     if (coordinates.containsKey(key)) coordinates.get(key).add(coordinate);
     else {
       List<Integer[]> list = new ArrayList<>();
@@ -136,8 +135,8 @@ public class Payload implements Serializable {
       ANSI_RESET,
       getClientName(), 
       isRename(), 
-      getPlayerBoard() != null ? "true" : "false", 
-      getPlayerDataList() != null || !getPlayerDataList().isEmpty() ? "true" : "false" , 
+      getPlayerBoard().getBoard() != GameBoard.getCleanBoard() ? "true" : "false", 
+      getPlayerDataList() != null && !getPlayerDataList().isEmpty() ? "true" : "false",
       getOpponentBoards() != null && !getOpponentBoardsList().isEmpty() ? "true" : "false", 
       getShips() != null && !getShipList().isEmpty() ? "true" : "false", 
       getCoordinates() != null && !getCoordinates().isEmpty() ? "true" : "false");

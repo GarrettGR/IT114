@@ -37,57 +37,57 @@ public class PlayerData implements Serializable{
 
     // --- Scores ---
 
-    public int getScore() { return score; }
+    public synchronized int getScore() { return score; }
 
-    public void setScore(int score) { this.score = score; }
+    public synchronized void setScore(int score) { this.score = score; }
 
-    public void incrementScore() { score++; }
+    public synchronized void incrementScore() { score++; }
 
-    public void incrementScore(int points) { score += points; }
+    public synchronized void incrementScore(int points) { score += points; }
 
     // --- Health ---
 
-    public int getHealth() { return health; }
+    public synchronized int getHealth() { return health; }
 
-    public void setHealth(int health) { this.health = health; }
+    public synchronized void setHealth(int health) { this.health = health; }
 
-    public void incrementHealth() { health++; }
+    public synchronized void incrementHealth() { health++; }
 
-    public void incrementHealth(int health) { this.health += health; }
+    public synchronized void incrementHealth(int health) { this.health += health; }
 
-    public void decrementHealth() { health--; }
+    public synchronized void decrementHealth() { health--; }
 
-    public void decrementHealth(int damage) { health -= damage; }
+    public synchronized void decrementHealth(int damage) { health -= damage; }
 
     // --- Hits ---
 
-    public int getHits() { return hits; }
+    public synchronized int getHits() { return hits; }
 
-    public void setHits(int hits) { this.hits = hits; }
+    public synchronized void setHits(int hits) { this.hits = hits; }
 
-    public void incrementHits() { hits++; }
+    public synchronized void incrementHits() { hits++; }
 
     // --- Misses ---
 
-    public int getMisses() { return misses; }
+    public synchronized int getMisses() { return misses; }
 
-    public void setMisses(int misses) { this.misses = misses; }
+    public synchronized void setMisses(int misses) { this.misses = misses; }
 
-    public void incrementMisses() { misses++; }
+    public synchronized void incrementMisses() { misses++; }
 
     // --- Currency ---
 
-    public int getCurrency() { return currency; }
+    public synchronized int getCurrency() { return currency; }
 
-    public void incrementCurrency() { currency++; }
+    public synchronized void incrementCurrency() { currency++; }
     
-    public void incrementCurrency(int amount) { currency += amount; }
+    public synchronized void incrementCurrency(int amount) { currency += amount; }
 
-    public void decrementCurrency() { currency--; }
+    public synchronized void decrementCurrency() { currency--; }
 
-    public void decrementCurrency(int amount) { currency -= amount; }
+    public synchronized void decrementCurrency(int amount) { currency -= amount; }
 
-    public void setCurrency(int currency) { this.currency = currency; }
+    public synchronized void setCurrency(int currency) { this.currency = currency; }
 
     @Override
     public String toString() {

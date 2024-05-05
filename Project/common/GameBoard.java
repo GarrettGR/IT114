@@ -39,7 +39,7 @@ public class GameBoard implements Serializable{
     this.board = getCleanBoard();
   }
 
-  public int getBoardSize() { return BOARD_SIZE; }
+  public static int getBoardSize() { return BOARD_SIZE; }
 
   public synchronized PieceType[][] getBoard() { return board; }
 
@@ -63,15 +63,15 @@ public class GameBoard implements Serializable{
 
   public synchronized void setBoard(GameBoard gameBoard) { this.setBoard(gameBoard.getCopy().getBoard()); }
 
-  public void setClientName(String clientName) { this.clientName = clientName; }
+  public synchronized  void setClientName(String clientName) { this.clientName = clientName; }
 
-  public String getClientName() { return clientName; }
+  public synchronized String getClientName() { return clientName; }
 
   public synchronized void setPiece(int x, int y, PieceType piece) { board[x][y] = piece; }
 
-  public PieceType getPiece(int x, int y) { return board[x][y]; }
+  public synchronized PieceType getPiece(int x, int y) { return board[x][y]; }
 
-  public boolean hasShips() {
+  public synchronized boolean hasShips() {
     for (int i = 0; i < BOARD_SIZE; i++)
       for (int j = 0; j < BOARD_SIZE; j++)
         if (board[i][j] == PieceType.SHIP) return true;
