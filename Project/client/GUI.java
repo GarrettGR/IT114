@@ -11,8 +11,7 @@ public class GUI {
   private UserPanelContainer userPanelContainer;
   private TabbedGamePane tabbedGamePane;
   private ChatScrollPane chatScrollPane;
-  private boolean gameDrawn = false;
-  private boolean firstPlace = true;
+  private int drawCount = 0;
 
   public GUI(Client client) {
     this.client = client;
@@ -42,15 +41,21 @@ public class GUI {
   public synchronized void ingestData(HashMap<String, PlayerData> playerData, HashMap<String, GameBoard> players) {
     HashMap<String, PlayerData> playerDataCopy = new HashMap<>(playerData);
     HashMap<String, GameBoard> playersCopy = new HashMap<>(players);
-    if (!gameDrawn) {
+    if (drawCount == 0){
       userPanelContainer = new UserPanelContainer(this, playerData);
       tabbedGamePane = new TabbedGamePane(this, players);
-      gameDrawn = true;
+      drawCount++;
     } else {
-      if (firstPlace) userPanelContainer.replaceAll(playerDataCopy); //? Just use the "new" keyword and replace it ??
-      else userPanelContainer.updateUserPanels(playerDataCopy);
-      if (firstPlace) tabbedGamePane.ReplaceAll(playersCopy);
-      else tabbedGamePane.updateGamePanels(playersCopy);
+      // if (drawCount == 1){
+      //   userPanelContainer.replaceAll(playerDataCopy); //? Just use the "new" keyword and replace it ??
+      //   tabbedGamePane.ReplaceAll(playersCopy);
+      //   drawCount++;
+      // } else {
+      //   userPanelContainer.updateUserPanels(playerDataCopy);
+      //   tabbedGamePane.updateGamePanels(playersCopy);
+      // }
+      userPanelContainer.replaceAll(playerDataCopy);
+      tabbedGamePane.ReplaceAll(playersCopy);
     }
 
     frame.getContentPane().removeAll();

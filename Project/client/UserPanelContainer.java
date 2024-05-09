@@ -19,13 +19,13 @@ public class UserPanelContainer extends JPanel {
     add(Box.createHorizontalGlue());
 
     for (Map.Entry<String, PlayerData> entry : playerData.entrySet()) {
-      UserPanel tempUserPanel = new UserPanel(entry.getKey());
+      UserPanel tempUserPanel = new UserPanel(entry.getKey(), entry.getValue().isAway(), entry.getValue().isTurn());
       // tempUserPanel.setName(entry.getKey());
       tempUserPanel.setHealth(entry.getValue().getHealth());
       tempUserPanel.setPoints(entry.getValue().getScore());
       tempUserPanel.setCurrency(entry.getValue().getCurrency());
       tempUserPanel.setAccuracy(entry.getValue().getHits(), entry.getValue().getMisses());
-      tempUserPanel.setStatus(entry.getValue().isTurn(), entry.getValue().isAway());
+      // tempUserPanel.setStatus(entry.getValue().isTurn(), entry.getValue().isAway());
       userPanels.add(tempUserPanel);
       add(tempUserPanel);
     }
@@ -47,7 +47,7 @@ public class UserPanelContainer extends JPanel {
     removeAll();
     userPanels.clear();
     for (Map.Entry<String, PlayerData> entry : playerData.entrySet()) {
-      UserPanel tempUserPanel = new UserPanel(entry.getKey());
+      UserPanel tempUserPanel = new UserPanel(entry.getKey(), entry.getValue().isAway(), entry.getValue().isTurn());
       tempUserPanel.setHealth(entry.getValue().getHealth());
       tempUserPanel.setPoints(entry.getValue().getScore());
       tempUserPanel.setCurrency(entry.getValue().getCurrency());
@@ -73,7 +73,7 @@ class UserPanel extends JPanel {
   private JPanel namePanel;
   private JPanel infoPanel;
 
-  public UserPanel(String name) {
+  public UserPanel(String name, boolean isAway, boolean isTurn) {
     this.name = name;
     setLayout(new BorderLayout());
     add(Box.createVerticalGlue());
@@ -82,7 +82,6 @@ class UserPanel extends JPanel {
     nameLabel = new JLabel(name);
     healthLabel = new JLabel("Health: 0");
     statusPanel = new JPanel();
-    this.setStatus(false, false);
     hitsLabel = new JLabel("Hits: 0");
     missesLabel = new JLabel("Misses: 0");
     accuracyLabel = new JLabel("Accuracy: 0%");
@@ -99,6 +98,7 @@ class UserPanel extends JPanel {
     infoPanel.add(pointsLabel);
     infoPanel.add(currencyLabel);
 
+
     namePanel.setLayout(new GridBagLayout());
     GridBagConstraints gbc = new GridBagConstraints();
     gbc.fill = GridBagConstraints.BOTH;
@@ -112,6 +112,7 @@ class UserPanel extends JPanel {
     gbc.weightx = 0; 
     gbc.weighty = 0;
     gbc.ipadx = 10;
+    this.setStatus(isTurn, isAway);
     namePanel.add(statusPanel, gbc);
 
     // Name Label
@@ -141,6 +142,7 @@ class UserPanel extends JPanel {
   }
 
   public final void setStatus(boolean isTurn, boolean isAway) {
+    System.out.println("Setting Status of " + name + " to: \n   - turn:" + isTurn + "\n   - away:" + isAway);
     if (isAway) statusPanel.setBackground(Color.RED);
     else if (!isTurn) statusPanel.setBackground(Color.GRAY);
     else statusPanel.setBackground(Color.GREEN);

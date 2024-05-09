@@ -154,7 +154,8 @@ public class Client {
       System.out.print(board.toString() + "  ");
       for (int i = 0; i < 30; i++) System.out.print("-");
       System.out.println();
-      System.out.println(String.format("%s statistics: %s", board.getClientName(), playerdata.get(board.getClientName().substring(0, board.getClientName().length() - 2)).toString()));
+      PlayerData playerData = playerdata.get(board.getClientName().substring(0, board.getClientName().length() - 2));
+      if (playerData != null) System.out.println(String.format("%s statistics: %s", board.getClientName(), playerData.toString()));
     }
     System.out.print(playerBoard.toString());
     System.out.println(String.format("%s statistics: %s", playerBoard.getClientName(), playerdata.get(this.clientName)));
@@ -268,10 +269,10 @@ public class Client {
     }
     for (Ship ship : ships) {
       if (ship.getType().getName().equalsIgnoreCase(parts[1])) {
-        int x = Integer.parseInt(parts[3]) - 1;
-        int y = Integer.parseInt(parts[2]) - 1;
-        ship.setAnchorY(y);
-        ship.setAnchorX(x);
+        int x = Integer.parseInt(parts[3]);
+        int y = Integer.parseInt(parts[2]);
+        ship.setAnchorY(y - 1);
+        ship.setAnchorX(x - 1);
         ship.setOrientation(parts[4].toLowerCase());
         if (!playerBoard.placeShip(ship)) {
           system_error("Invalid ship placement");

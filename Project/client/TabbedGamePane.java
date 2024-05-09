@@ -39,7 +39,6 @@ public class TabbedGamePane extends JTabbedPane {
       for (int i = 0; i < getTabCount(); i++) {
         JLabel tabLabel = getTabLabel(i);
         if (i == selectedIndex) {
-          System.out.println("Selected tab: " + getTitleAt(i));
           tabLabel.setForeground(Color.YELLOW);
           setTabComponentAt(i, tabLabel);
         } else {
@@ -61,32 +60,37 @@ public class TabbedGamePane extends JTabbedPane {
     }
   }
 
-  public void updateGamePanels(HashMap<String, GameBoard> boards) {
-    int index = 0;
-    for (GameBoard board : boards.values()) {
+public void updateGamePanels(HashMap<String, GameBoard> boards) {
+  int index = 0;
+  for (GameBoard board : boards.values()) {
+    if (gamePanels.containsKey(index)) {
       gamePanels.get(index).setGameBoard(board);
-    }
-  }
-
-  public void ReplaceAll(HashMap<String, GameBoard> boards) {
-    removeAll();
-    gamePanels.clear();
-    int index = 0;
-    for(Map.Entry<String, GameBoard> entry : boards.entrySet()) {
-      GamePanel tempGamePanel = new GamePanel(entry.getValue());
-      gamePanels.put(index, tempGamePanel);
-      addTab(entry.getKey(), tempGamePanel);
-      setMnemonicAt(index, KeyEvent.VK_1 + index);
       index++;
-    }
-    for (int i = 0; i < getTabCount(); i++) {
-      JLabel tabLabel = new JLabel(getTitleAt(i));
-      if (i == 0) tabLabel.setForeground(Color.YELLOW);
-      tabLabel.setHorizontalAlignment(SwingConstants.CENTER);
-      tabLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-      setTabComponentAt(i, tabLabel);
+    } else {
+      break;
     }
   }
+}
+
+public void ReplaceAll(HashMap<String, GameBoard> boards) {
+  removeAll();
+  gamePanels.clear();
+  int index = 0;
+  for(Map.Entry<String, GameBoard> entry : boards.entrySet()) {
+    GamePanel tempGamePanel = new GamePanel(entry.getValue());
+    gamePanels.put(index, tempGamePanel);
+    addTab(entry.getKey(), tempGamePanel);
+    setMnemonicAt(index, KeyEvent.VK_1 + index);
+    index++;
+  }
+  for (int i = 0; i < getTabCount(); i++) {
+    JLabel tabLabel = new JLabel(getTitleAt(i));
+    if (i == 0) tabLabel.setForeground(Color.YELLOW);
+    tabLabel.setHorizontalAlignment(SwingConstants.CENTER);
+    tabLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+    setTabComponentAt(i, tabLabel);
+  }
+}
 }
 
 class GamePanel extends JPanel {

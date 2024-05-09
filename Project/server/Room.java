@@ -151,7 +151,11 @@ public class Room implements AutoCloseable {
               client.sendMessage("Server", "Name already taken");
             }
             break;
-          case PM:           
+          case PM:
+            if(client.isSpectator()) {
+              client.sendMessage("Server", "You can't send private messages as a spectator");
+              break;
+            }
             List<ServerThread> targets = new ArrayList<>();
             List<String> targetNames = new ArrayList<>();
             StringBuilder privMsg = new StringBuilder();

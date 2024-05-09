@@ -24,6 +24,8 @@ public class ChatScrollPane extends JScrollPane {
   public ChatScrollPane(GUI gui) {
     this.gui = gui;
     chatArea = new JTextArea();
+    chatArea.setLineWrap(true);
+    chatArea.setWrapStyleWord(true);
     chatField = new JTextField(15);
     sendButton = new JButton("Send");
     chatArea.setEditable(false);

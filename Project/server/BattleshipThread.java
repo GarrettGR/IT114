@@ -2,15 +2,16 @@ package Project.server;
 
 import Project.common.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors; //? Use a semaphore instead?
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledFuture; //? Use a semaphore instead?
 import java.util.concurrent.TimeUnit;
 
 public class BattleshipThread extends Thread { //? implement auto-closeable?
@@ -23,8 +24,8 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private countDown counterTimer;
   private ServerThread currentPlayer; //? make this volatile?
 
-  private LinkedHashMap<ServerThread, PlayerData> players = new LinkedHashMap<>();
-  private Iterator<ServerThread> playerIterator;
+  private ConcurrentLinkedQueue<ServerThread> playerOrder = new ConcurrentLinkedQueue<>();
+  private ConcurrentHashMap<ServerThread, PlayerData> players = new ConcurrentHashMap<>();
   private List<ServerThread> spectators = new ArrayList<>();
 
   // private Map<ShipType, Integer> shipCounts = Map.of(
@@ -64,7 +65,6 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     this.hardDifficulty = hardDifficulty;
     this.salvoGameMode = salvoGameMode;
     this.room = room;
-    playerIterator = players.keySet().iterator();
     printGameInfo("Battleship game thread created");
     counterTimer = new countDown(() -> { placementPhase(); }, playerCount < 4 ? playerCount : 4, 120);
   }
@@ -262,13 +262,19 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     }
   }
 
-  protected synchronized void addSpectator(ServerThread spectator) { spectators.add(spectator); }
+  protected synchronized void addSpectator(ServerThread spectator) {
+    spectator.isSpectator(true);
+    spectators.add(spectator);
+  }
 
   protected synchronized void removePlayer(ServerThread player) { 
     players.remove(player); 
   }
 
-  protected synchronized void removeSpectator(ServerThread spectator) { spectators.remove(spectator); }
+  protected synchronized void removeSpectator(ServerThread spectator) { 
+    spectator.isSpectator(false);
+    spectators.remove(spectator); 
+  }
 
   protected synchronized boolean hasPlayer(ServerThread player) { return players.keySet().contains(player);}
 
@@ -338,16 +344,26 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   }
 
   private synchronized ServerThread getNextPlayer() {
-    if (!this.playerIterator.hasNext()) this.playerIterator = players.keySet().iterator();
-    if (!this.playerIterator.hasNext()) return null; //? if it still has nothing... there was an issue
-    ServerThread player = this.playerIterator.next();
-    if (!player.getGameBoard().hasShips()) {
-      sendGameMessage(player, "You lost all your ships, but you can still watch as a spectator");
-      addSpectator(player);
-      this.playerIterator.remove();
-      return getNextPlayer();
+    players.get(currentPlayer).isTurn(false);
+    playerOrder.remove(currentPlayer);
+    playerOrder.add(currentPlayer);
+    for (ServerThread player : playerOrder) {
+      if (!player.getGameBoard().hasShips()) {
+        sendGameMessage(player, "You lost all your ships, but you can still watch as a spectator");
+        addSpectator(player);
+        removePlayer(player);
+        playerOrder.remove(player);
+      } else {
+        PlayerData nextPlayerData = players.get(player);
+        if (nextPlayerData != null) nextPlayerData.isTurn(true);
+        playerOrder.remove(player);
+        playerOrder.add(player);
+        System.out.println("The player order is: " );
+        for (ServerThread p : playerOrder) System.out.println("  - " + p.getClientName() + " : " + players.get(p));
+        return player;
+      }
     }
-    return player;
+    return null;
   }
 
   private void placementPhase() {
@@ -378,11 +394,16 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     started = true;
     for (ServerThread player : players.keySet()) sendGameMessage(player, "The game has started"); //? unnecessary?
 
-    // printGameInfo("The player order is: "); //? how can I randomize the order of a hashmap?
-    // for (ServerThread player : players.keySet()) printGameInfo("  - " + player.getClientName());
+    List<ServerThread> shuffledPlayers = new ArrayList<>(players.keySet());
 
-    playerIterator = players.keySet().iterator(); //? could I have it getNextPlayer() a 'random' number of times?
-    currentPlayer = getNextPlayer();
+    Collections.shuffle(shuffledPlayers);
+
+    System.out.println("The player order is: ");
+    for (ServerThread p : shuffledPlayers) System.out.println("  - " + p.getClientName());
+
+    playerOrder.addAll(shuffledPlayers);
+    
+    currentPlayer = playerOrder.peek();
 
     printGameInfo("The current player is: " + currentPlayer.getClientName());
 
@@ -503,7 +524,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
       }, () -> {
         
         printGameInfo("The old current player was: " + ANSI_RED + currentPlayer.getClientName() + ANSI_YELLOW+ " and they have run out of time");
-        sendGameMessage(currentPlayer, "Unfortunatley, you have run out of time, you will be skipped this turn");
+        sendGameMessage(currentPlayer, "Unfortunately, you have run out of time, you will be skipped this turn");
         
         currentPlayer = getNextPlayer();
 
