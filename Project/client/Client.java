@@ -64,6 +64,8 @@ public class Client {
       /place [ship] [column] [row] [direction] - Place a ship on your board
           note: with one end at the location provided, direction = 'up', 'down', 'left', 'right'
 
+      /multishot @[player] [column] [row] [column] [row] - Attack two positions on the board of that player, costs 10 currency
+
       /board - Show your board
       /ships - List the ships you have left to place
       /boards - Show all player's boards
@@ -73,6 +75,8 @@ public class Client {
       /game - Show the game you are currently in
       /leavegame - Leave the game
       /spectate - Stop playing and watch the game instead 
+      /away - Stay in the game, but skip your turn
+      /resume - Resume playing after being away
 
       /help - Show this help message"""; //! STILL HAVE TO ADD /SPECTATE
 
@@ -85,6 +89,7 @@ public class Client {
   private String clientName = "";
   private List<Ship> ships = new ArrayList<>();
   private List<Ship> placedShips = new ArrayList<>();
+  private List<Integer[]> coords = new ArrayList<>();
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>();
   private Map<String, List<Integer[]>> coordinates = new HashMap<>();
@@ -214,7 +219,7 @@ public class Client {
         }
         sendGameEvent(PayloadType.GAME_START, parts[1]);
         return true;
-      case "/ships", "/place", "/attack":
+      case "/ships", "/place", "/attack", "/multishot":
         return processGameCommands(parts);
     }
     return false;
@@ -231,8 +236,20 @@ public class Client {
       return true;
     case "/attack":
       if (parts.length != 4) system_error("Invalid attack command");
-      else attackPlayer(parts[1].substring(1), Integer.parseInt(parts[3]), Integer.parseInt(parts[2]));
+      else attackPlayer(parts[1].substring(1), Integer.parseInt(parts[3]), Integer.parseInt(parts[2]), true);
       return true;
+    case "/multishot":
+      if (parts.length != 6) {
+        system_error("Invalid multi-shot command");
+        return true;
+      }
+      if(playerdata.get(this.clientName).getCurrency() < 10) {
+        system_error("You do not have enough currency to use this bonus action!");
+        return true;
+      }
+      attackPlayer(parts[1].substring(1), Integer.parseInt(parts[3]), Integer.parseInt(parts[2]), false);
+      attackPlayer(parts[1].substring(1), Integer.parseInt(parts[4]), Integer.parseInt(parts[5]), true);
+      return false;
     }
     return false;
   }
@@ -282,6 +299,11 @@ public class Client {
         system_print("Placed " + ship.getType().getName() + " at " + y + ", " + x + " facing " + parts[4]);
         ships.remove(ship);
         System.out.println(playerBoard.toString());
+        HashMap<String, GameBoard> tempBoard = new HashMap<>();
+        tempBoard.put(this.clientName, this.playerBoard);
+        HashMap<String, PlayerData> tempData = new HashMap<>();
+        tempData.put(this.clientName, playerdata.get(this.clientName));
+        gui.ingestData(tempData,tempBoard);
         break;
       }
     }
@@ -296,8 +318,7 @@ public class Client {
     }
   }
 
-  private void attackPlayer(String target, int row, int column) {
-    List<Integer[]> coords = new ArrayList<>();
+  private void attackPlayer(String target, int row, int column, boolean finishedAttack) {
     if (!isTurn) {
       system_error("It is not your turn");
       return;
@@ -316,9 +337,11 @@ public class Client {
     }
     coords.add(new Integer[]{row - 1, column - 1});
     this.coordinates.put(target, coords);
-    opponentBoards.remove(target);
+    if (finishedAttack) opponentBoards.remove(target);
     // sendGameEvent(PayloadType.GAME_TURN, target, row - 1, column - 1);
-    if (this.opponentBoards.isEmpty()) sendGameEvent(PayloadType.GAME_TURN, this.coordinates); // send the attacks when all players have attacked
+    if (this.opponentBoards.isEmpty()) {
+      sendGameEvent(PayloadType.GAME_TURN, this.coordinates);
+    }
   }
 
   private void sendGameEvent(PayloadType type, Object ... data){
@@ -462,6 +485,7 @@ public class Client {
         ships = p.getShipList();
         playerBoard.setBoard(p.getPlayerBoard());
         playerBoard.setClientName("Your");
+        this.playerdata = p.getPlayerDataMap();
         System.out.println(p.getMessage() + '\n' + playerBoard.toString());
         gui.ingestMessage(p.getMessage());
         HashMap<String, GameBoard> tempBoard = new HashMap<>();
@@ -480,6 +504,7 @@ public class Client {
         this.isTurn = p.isTurn();
         this.placedShips = new ArrayList<>(); // reset turn-specific data
         this.coordinates = new HashMap<>();
+        this.coords = new ArrayList<>();
         this.playerBoard = new GameBoard(p.getPlayerBoard());
         this.playerBoard.setClientName("Your");
         this.opponentBoards = p.getOpponentBoardsMap();

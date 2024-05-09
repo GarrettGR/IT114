@@ -62,6 +62,7 @@ public class ChatScrollPane extends JScrollPane {
 
   protected void printMessage(String message) {
     chatArea.append(message + "\n");
+    chatArea.setCaretPosition(chatArea.getDocument().getLength());
     chatField.setText("");  
   }
 

@@ -142,7 +142,6 @@ class UserPanel extends JPanel {
   }
 
   public final void setStatus(boolean isTurn, boolean isAway) {
-    System.out.println("Setting Status of " + name + " to: \n   - turn:" + isTurn + "\n   - away:" + isAway);
     if (isAway) statusPanel.setBackground(Color.RED);
     else if (!isTurn) statusPanel.setBackground(Color.GRAY);
     else statusPanel.setBackground(Color.GREEN);

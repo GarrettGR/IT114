@@ -59,6 +59,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private static final String SPECTATORS = "spectators";
   private static final String GAME = "game";
   private static final String LEAVE_GAME = "leave game";
+  private static final String AWAY = "away";
 
 
   public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode, int playerCount) {
@@ -73,6 +74,14 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   public synchronized void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
     Payload payload = new Payload();
+    for (Map.Entry<ServerThread, PlayerData> entry : players.entrySet()) {
+      if (entry.getKey().isAway()) entry.getValue().isAway(true);
+      else entry.getValue().isAway(false);
+      if (entry.getKey().isTurn()) {
+        entry.getValue().isTurn(true);
+        payload.setTurn(true);
+      } else entry.getValue().isTurn(false);
+    }
     payload.setPayloadType(type);
     payload.setClientName("Game"); //? should this be the client/player name?
     payload.setRoomName(room.getName());
@@ -82,7 +91,6 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     payload.setPlayerDataWithList(getPlayerMapWithList(players));
     for (ServerThread p : players.keySet()) { 
       if (p == null) continue;
-      if (p == currentPlayer) payload.setTurn(true);
       if (p == player) continue;
       payload.setPlayerBoard(p.getGameBoard());
       payload.setOpponentBoards(getOpponentBoards(p));
@@ -170,6 +178,10 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
           sendGameMessage(player, "You are not in the game");
         }
       }
+      case AWAY -> this.currentPlayer = getNextPlayer();
+      case "multishot" -> {
+        players.get(player).decrementCurrency(10);
+      }
       default -> sendGameMessage(player, "Invalid command");
     }
   }
@@ -223,10 +235,10 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
             sendGameMessage(player, "You must target at least one location");
             return;
           }
-          if (!salvoGameMode && coordinates.size() > 1) {
-            sendGameMessage(player, "You can only target one location in Classic mode");
-            return;
-          }
+          // if (!salvoGameMode && coordinates.size() > 1) {
+          //   sendGameMessage(player, "You can only target one location in Classic mode");
+          //   return;
+          // }
           if (getPlayer(name) == null) {
             sendGameMessage(player, "Invalid target");
             return;
@@ -239,6 +251,8 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
               sendGameMessage(player, "Invalid coordinates");
               return;
             } else if (targetBoard.getPiece(x, y) == PieceType.HIT || targetBoard.getPiece(x, y) == PieceType.MISS) {
+
+              System.out.println("\n\ntargetting (" + x + "," + y + "): " + targetBoard + "\n\n and it found: " + targetBoard.getPiece(x, y) + "\n");
               sendGameMessage(player, "You have already targeted that location");
               return;
             }
@@ -269,11 +283,16 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   protected synchronized void removePlayer(ServerThread player) { 
     players.remove(player); 
+    playerOrder.remove(player);
   }
 
   protected synchronized void removeSpectator(ServerThread spectator) { 
     spectator.isSpectator(false);
     spectators.remove(spectator); 
+  }
+
+  protected synchronized void nextPlayer () {
+    this.currentPlayer = getNextPlayer();
   }
 
   protected synchronized boolean hasPlayer(ServerThread player) { return players.keySet().contains(player);}
@@ -344,7 +363,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   }
 
   private synchronized ServerThread getNextPlayer() {
-    players.get(currentPlayer).isTurn(false);
+    currentPlayer.isTurn(false);
     playerOrder.remove(currentPlayer);
     playerOrder.add(currentPlayer);
     for (ServerThread player : playerOrder) {
@@ -354,12 +373,14 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         removePlayer(player);
         playerOrder.remove(player);
       } else {
-        PlayerData nextPlayerData = players.get(player);
-        if (nextPlayerData != null) nextPlayerData.isTurn(true);
+        if (player.isAway()) {
+          sendGameMessage(player, "You are away, you will be skipped this turn");
+          continue;
+        }
+        player.isTurn(true);
+        players.get(player).incrementCurrency();
         playerOrder.remove(player);
         playerOrder.add(player);
-        System.out.println("The player order is: " );
-        for (ServerThread p : playerOrder) System.out.println("  - " + p.getClientName() + " : " + players.get(p));
         return player;
       }
     }
@@ -404,6 +425,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     playerOrder.addAll(shuffledPlayers);
     
     currentPlayer = playerOrder.peek();
+    currentPlayer.isTurn(true);
 
     printGameInfo("The current player is: " + currentPlayer.getClientName());
 
@@ -441,6 +463,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
           targetPlayer.decrementHealth();
           attackingPlayer.incrementHits();
           attackingPlayer.incrementScore();
+          attackingPlayer.incrementCurrency(3);
         } else {
           printGameInfo(String.format("%sMiss%s", ANSI_RED, ANSI_RESET));
 
@@ -531,7 +554,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         if (currentPlayer != null) sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
         else isRunning = false;
 
-      }, players.size() - 1, 60);
+      }, players.size() - 1, 120);
         if (players.size() <= 1) break;
         counterTimer.runLambdas();
     }
