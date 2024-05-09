@@ -2,16 +2,17 @@ package Project.client;
 
 import Project.common.*;
 import java.awt.*;
-import javax.swing.*;
 import java.util.HashMap;
+import javax.swing.*;
 
 public class GUI {
   private JFrame frame;
-  private static Client client;
+  private Client client;
   private UserPanelContainer userPanelContainer;
   private TabbedGamePane tabbedGamePane;
   private ChatScrollPane chatScrollPane;
   private boolean gameDrawn = false;
+  private boolean firstPlace = true;
 
   public GUI(Client client) {
     this.client = client;
@@ -20,40 +21,59 @@ public class GUI {
     frame.setSize(800, 665);
     frame.setLayout(new BorderLayout());
 
-    ChatScrollPane chatScrollPane = new ChatScrollPane();
+    chatScrollPane = new ChatScrollPane(this);
     
     frame.add(chatScrollPane.getPanel(), BorderLayout.EAST);
 
     frame.setVisible(true);
   }
 
-  public void ingestMessage(String message) { ChatScrollPane.printMessage(message); }
+  public void ingestMessage(String message) { chatScrollPane.printMessage(message); }
 
-  public static void pushMessage(String message) { 
+  public void pushMessage(String message) { 
     try { 
-      client.handleMessage(message); 
+      System.out.println(message);
+      client.handleMessage(message);
     } catch (Exception e) { 
-      ChatScrollPane.printMessage("Error: " + e.getMessage()); 
+      chatScrollPane.printMessage("Error: " + e.getMessage()); 
     }
   }
 
-  public void ingestData(HashMap<String, PlayerData> playerData, HashMap<String, GameBoard> players) {
+  public synchronized void ingestData(HashMap<String, PlayerData> playerData, HashMap<String, GameBoard> players) {
+    HashMap<String, PlayerData> playerDataCopy = new HashMap<>(playerData);
+    HashMap<String, GameBoard> playersCopy = new HashMap<>(players);
     if (!gameDrawn) {
-      userPanelContainer = new UserPanelContainer(playerData);
-      tabbedGamePane = new TabbedGamePane(players);
-      drawGame();
+      userPanelContainer = new UserPanelContainer(this, playerData);
+      tabbedGamePane = new TabbedGamePane(this, players);
       gameDrawn = true;
     } else {
-      userPanelContainer.updateUserPanels(playerData);
-      tabbedGamePane.updateGamePanels(players);
+      if (firstPlace) userPanelContainer.replaceAll(playerDataCopy); //? Just use the "new" keyword and replace it ??
+      else userPanelContainer.updateUserPanels(playerDataCopy);
+      if (firstPlace) tabbedGamePane.ReplaceAll(playersCopy);
+      else tabbedGamePane.updateGamePanels(playersCopy);
     }
-  }
 
-  public void drawGame(){
+    frame.getContentPane().removeAll();
     frame.add(userPanelContainer, BorderLayout.NORTH);
     frame.add(tabbedGamePane, BorderLayout.CENTER);
     frame.add(chatScrollPane.getPanel(), BorderLayout.EAST);
+
+    frame.revalidate();
+    frame.repaint();
   }
+
+  public void updateConnection (boolean isConnected) { 
+    frame.getContentPane().removeAll();
+    chatScrollPane = new ChatScrollPane(this);
+    chatScrollPane.updateConnection(isConnected); 
+    frame.add(chatScrollPane.getPanel(), BorderLayout.EAST);
+    frame.revalidate();
+    frame.repaint();  
+  }
+
+  public String getUserName() { return chatScrollPane.getUsername(); }
+
+  public void updateName() { chatScrollPane.setUsername(client.getClientName()); }
 
   public void setClient(Client client) { this.client = client; }
 }

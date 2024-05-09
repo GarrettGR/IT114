@@ -26,6 +26,7 @@ public class Room implements AutoCloseable {
   private final static String PM = "pm";
   private final static String GAME_PLAY = "creategame";
   private final static String GAME_LIST = "games";
+  private final static String SPECTATE = "spectate";
 
   public Room(String name) {
     this.name = name;
@@ -256,6 +257,17 @@ public class Room implements AutoCloseable {
           //     }
           //   }
           //   break;
+          case SPECTATE:
+            int gameId = Integer.parseInt(comm2[1]);
+            for (BattleshipThread game : games) {
+              if (game.threadId() == gameId) {
+                if (game.hasPlayer(client)) game.removePlayer(client);
+                game.addSpectator(client);
+                client.isSpectator(true);
+                break;
+              }
+            }
+            break;
           case "turn", "board", "boards", "players", "spectators", "game", "leavegame":
             for (BattleshipThread game : games)
               if (game.hasPlayer(client)) {

@@ -4,18 +4,25 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 
+// Yes... I know making these static is lazy, but i don't have the energy to do it right (atm)
 public class ChatScrollPane extends JScrollPane {
-  private static JTextArea chatArea;
-  private static JTextField chatField;
+  private GUI gui;
+  private JTextArea chatArea;
+  private JTextField chatField;
   private JButton sendButton;
-  private boolean isConnected = true;
-  private String username;
+  private boolean isConnected = false;
+  protected String username;
   private String server;
   private String roomName;
   private JPanel infoPanel;
   private JPanel chatPanel;
+  private JLabel usernameLabel = new JLabel(); 
+  private JLabel serverLabel = new JLabel();
+  // private JLabel roomNameLabel = new JLabel();
 
-  public ChatScrollPane() {
+
+  public ChatScrollPane(GUI gui) {
+    this.gui = gui;
     chatArea = new JTextArea();
     chatField = new JTextField(15);
     sendButton = new JButton("Send");
@@ -23,12 +30,9 @@ public class ChatScrollPane extends JScrollPane {
 
     infoPanel = new JPanel();
     infoPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
-    infoPanel.add(new JLabel("Username:"));
-    infoPanel.add(new JLabel(username));
-    infoPanel.add(new JLabel("Server:"));
-    infoPanel.add(new JLabel(server));
-    infoPanel.add(new JLabel("Room:"));
-    infoPanel.add(new JLabel(roomName));
+    infoPanel.add(usernameLabel);
+    infoPanel.add(serverLabel);
+    // infoPanel.add(roomNameLabel);
 
     chatPanel = new JPanel();
     chatPanel.setLayout(new FlowLayout(FlowLayout.TRAILING));
@@ -44,19 +48,17 @@ public class ChatScrollPane extends JScrollPane {
     chatField.addActionListener((ActionEvent e) -> { sendMessage(); });
   }
 
-  protected static void pushMessage(String message) {
-    System.out.println(message);
-  }
+  protected void pushMessage(String message) { gui.pushMessage(message); }
 
   private void sendMessage() {
     String message = chatField.getText();
     if (!message.isEmpty()) {
-      pushMessage(message);
       printMessage(username + ": " + message);
+      pushMessage(message);
     }
   }
 
-  protected static void printMessage(String message) {
+  protected void printMessage(String message) {
     chatArea.append(message + "\n");
     chatField.setText("");  
   }
@@ -66,23 +68,28 @@ public class ChatScrollPane extends JScrollPane {
     panel.setLayout(new BorderLayout());
 
     if (!isConnected) {
-      panel.add(new ConnectionPanel(), BorderLayout.NORTH);
+      panel.add(new ConnectionPanel(this), BorderLayout.NORTH);
     } else {
       panel.add(infoPanel, BorderLayout.NORTH);
-      panel.add(chatArea, BorderLayout.CENTER);
+      panel.add(this, BorderLayout.CENTER);
       panel.add(chatPanel, BorderLayout.SOUTH);
     }
     return panel;
   }
 
-  public void setConnected(boolean isConnected) { this.isConnected = isConnected; }
+  public void updateConnection(boolean isConnected) { this.isConnected = isConnected; }
 
-  public static void sendConnection(String username, String server, int port) {
-    System.out.println(String.format("%s@%s:%s", username, server, port));
+  public void sendConnection(String username, String server, int port) {
+    pushMessage(String.format("/name %s", username));
     pushMessage(String.format("/connect %s:%s", server, port));
+    this.username = username;
+    usernameLabel.setText("Username: " + username);
+    serverLabel.setText("Server: " + server);
   }
 
   public void setUsername(String username) { this.username = username; }
+
+  public String getUsername() { return username; }
 
   public void setServer(String server) { this.server = server; }
 
@@ -96,12 +103,14 @@ public class ChatScrollPane extends JScrollPane {
 }
 
 class ConnectionPanel extends JPanel {
+  private ChatScrollPane chat;
   private JTextField usernameField;
   private JTextField hostField;
   private JTextField portField;
   private JButton connectButton;
 
-  public ConnectionPanel() {
+  public ConnectionPanel(ChatScrollPane chatScrollPane) {
+    this.chat = chatScrollPane;
     usernameField = new JTextField(10);
     hostField = new JTextField(15);
     portField = new JTextField(5);
@@ -131,7 +140,7 @@ class ConnectionPanel extends JPanel {
     add(connectButton);
 
     connectButton.addActionListener((ActionEvent e) -> {
-      ChatScrollPane.sendConnection(usernameField.getText(), hostField.getText(), Integer.parseInt(portField.getText()));
+      chat.sendConnection(usernameField.getText(), hostField.getText(), Integer.parseInt(portField.getText()));
     });
   }
 }

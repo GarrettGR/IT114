@@ -108,6 +108,8 @@ public class Client {
     }
   }
 
+  public String getClientName() { return clientName; }
+
   // --- Start of Checkers ---
 
   public boolean isConnected() {
@@ -150,7 +152,7 @@ public class Client {
   private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards, String message) {
     for (GameBoard board : opponentBoards) {
       System.out.print(board.toString() + "  ");
-      for (int i = 0; i < 30; i++) game_print("-");
+      for (int i = 0; i < 30; i++) System.out.print("-");
       System.out.println();
       System.out.println(String.format("%s statistics: %s", board.getClientName(), playerdata.get(board.getClientName().substring(0, board.getClientName().length() - 2)).toString()));
     }
@@ -168,6 +170,7 @@ public class Client {
       case "/connect":
         if (isConnected()) {
           system_error("Already connected to a server");
+          gui.updateConnection(true);
           return true;
         } else if (!isConnection(text)) {
           system_error("Invalid connection command");
@@ -175,7 +178,7 @@ public class Client {
         }
         if (clientName.isBlank()) system_print("You can set your name by using: /name [username]");
         String[] connectionParts = parts[1].split(":");
-        connect(connectionParts[0].trim(), Integer.parseInt(connectionParts[1].trim()));
+        gui.updateConnection((connect(connectionParts[0].trim(), Integer.parseInt(connectionParts[1].trim()))));
         return true;
       case "/quit":
         isRunning = false;
@@ -187,6 +190,7 @@ public class Client {
           else system_print("Your name is: " + clientName);
         } else {
           clientName = parts[1];
+          gui.updateName();
           system_print("Name set to: " + clientName);
         }
         return true;
@@ -245,7 +249,7 @@ public class Client {
     }
   }
 
-  private void placeShips(String[] parts) { //place [ship] [row] [column] [direction]
+  private void placeShips(String[] parts) {
     boolean validType = false;
     boolean hasShip = false;
     if (parts.length != 5) {
@@ -276,7 +280,7 @@ public class Client {
         placedShips.add(ship);
         system_print("Placed " + ship.getType().getName() + " at " + y + ", " + x + " facing " + parts[4]);
         ships.remove(ship);
-        system_print(playerBoard.toString());
+        System.out.println(playerBoard.toString());
         break;
       }
     }
@@ -445,7 +449,10 @@ public class Client {
     switch (p.getPayloadType()) {
       case CONNECT, DISCONNECT -> system_print(String.format("*%s %s*", p.getClientName(), p.getMessage()));
       case MESSAGE -> {
-        if (p.isRename()) this.clientName = p.getMessage().split(" ")[p.getMessage().split(" ").length - 1];
+        if (p.isRename()) { 
+          this.clientName = p.getMessage().split(" ")[p.getMessage().split(" ").length - 1];
+          gui.updateName();
+        }
         server_print(String.format("%s: %s", p.getClientName(), p.getMessage()));
       }
       case GAME_PLACE -> {
@@ -454,7 +461,13 @@ public class Client {
         ships = p.getShipList();
         playerBoard.setBoard(p.getPlayerBoard());
         playerBoard.setClientName("Your");
-        server_print(p.getMessage() + '\n' + playerBoard.toString());
+        System.out.println(p.getMessage() + '\n' + playerBoard.toString());
+        gui.ingestMessage(p.getMessage());
+        HashMap<String, GameBoard> tempBoard = new HashMap<>();
+        HashMap<String, PlayerData> tempData = new HashMap<>();
+        tempBoard.put(this.clientName, this.playerBoard);
+        tempData.put(this.clientName, p.getPlayerData(this.clientName));
+        gui.ingestData(tempData, tempBoard);
         printShips();
       }
       case GAME_STATE -> {
@@ -471,6 +484,14 @@ public class Client {
         this.opponentBoards = p.getOpponentBoardsMap();
         this.playerdata = p.getPlayerDataMap();
 
+        HashMap<String, GameBoard> tempBoard = new HashMap<>();
+        HashMap<String, PlayerData> tempData = new HashMap<>();
+
+        tempData.putAll(this.playerdata);
+        tempBoard.putAll(this.opponentBoards);
+        tempBoard.put(this.clientName, this.playerBoard);
+
+        gui.ingestData(tempData, tempBoard);
         drawGame(this.playerBoard, p.getOpponentBoards(), p.getMessage());
       }
       case PING -> { /* do nothing */ }

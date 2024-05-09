@@ -4,21 +4,24 @@ import Project.common.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Map;
 import javax.swing.*;
 
 public class TabbedGamePane extends JTabbedPane {
+  private GUI gui;
   protected HashMap<Integer, GamePanel> gamePanels = new HashMap<>();
 
-  public TabbedGamePane(HashMap<String, GameBoard> players) {
+  public TabbedGamePane(GUI gui, HashMap<String, GameBoard> players) {
+    this.gui = gui;
     setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 5));
     setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
 
     int index = 0;
-    for (GameBoard board : players.values()) {
-      GamePanel tempGamePanel = new GamePanel(board);
+    for(Map.Entry<String, GameBoard> entry : players.entrySet()) {
+      removeAll();
+      GamePanel tempGamePanel = new GamePanel(entry.getValue());
       gamePanels.put(index, tempGamePanel);
-      addTab(board.getClientName(), tempGamePanel);
+      addTab(entry.getKey(), tempGamePanel);
       setMnemonicAt(index, KeyEvent.VK_1 + index);
       index++;
     }
@@ -32,7 +35,7 @@ public class TabbedGamePane extends JTabbedPane {
     }
   
     addChangeListener(e -> {
-      int selectedIndex = getSelectedIndex();
+      int selectedIndex = getSelectedIndex() != -1 ? getSelectedIndex() : 0;
       for (int i = 0; i < getTabCount(); i++) {
         JLabel tabLabel = getTabLabel(i);
         if (i == selectedIndex) {
@@ -47,12 +50,41 @@ public class TabbedGamePane extends JTabbedPane {
     });
   }
 
-  public JLabel getTabLabel(int index) { return (JLabel) getTabComponentAt(index); }
+  public JLabel getTabLabel(int index) {
+    Component component = getTabComponentAt(index);
+    if (component instanceof JLabel jLabel) {
+      return jLabel;
+    } else {
+      JLabel newLabel = new JLabel(getTitleAt(index));
+      setTabComponentAt(index, newLabel);
+      return newLabel;
+    }
+  }
 
   public void updateGamePanels(HashMap<String, GameBoard> boards) {
     int index = 0;
     for (GameBoard board : boards.values()) {
       gamePanels.get(index).setGameBoard(board);
+    }
+  }
+
+  public void ReplaceAll(HashMap<String, GameBoard> boards) {
+    removeAll();
+    gamePanels.clear();
+    int index = 0;
+    for(Map.Entry<String, GameBoard> entry : boards.entrySet()) {
+      GamePanel tempGamePanel = new GamePanel(entry.getValue());
+      gamePanels.put(index, tempGamePanel);
+      addTab(entry.getKey(), tempGamePanel);
+      setMnemonicAt(index, KeyEvent.VK_1 + index);
+      index++;
+    }
+    for (int i = 0; i < getTabCount(); i++) {
+      JLabel tabLabel = new JLabel(getTitleAt(i));
+      if (i == 0) tabLabel.setForeground(Color.YELLOW);
+      tabLabel.setHorizontalAlignment(SwingConstants.CENTER);
+      tabLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+      setTabComponentAt(i, tabLabel);
     }
   }
 }
@@ -64,6 +96,7 @@ class GamePanel extends JPanel {
 
   public void setGameBoard(GameBoard gameBoard) {
     this.gameBoard = gameBoard;
+    revalidate();
     repaint();
   }
 
@@ -79,6 +112,26 @@ class GamePanel extends JPanel {
         int x = col * cellSize;
         int y = row * cellSize;
         g.drawRect(x, y, cellSize, cellSize);
+  
+        PieceType pieceType = gameBoard.getPiece(row, col);
+
+        if (null == pieceType) continue;
+        switch (pieceType) {
+          case HIT -> {
+            g.setColor(Color.RED);
+            g.fillRect(x, y, cellSize, cellSize);
+          }
+          case MISS -> {
+            g.setColor(Color.YELLOW);
+            g.fillRect(x, y, cellSize, cellSize);
+          }
+          case SHIP -> {
+            g.setColor(Color.BLUE);
+            g.fillRect(x, y, cellSize, cellSize);
+          }
+          default -> { }
+          }
+          g.setColor(Color.WHITE);
       }
     }
   }

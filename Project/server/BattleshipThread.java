@@ -2,9 +2,9 @@ package Project.server;
 
 import Project.common.*;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -51,7 +51,6 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   protected static final String ANSI_RED = "\u001B[31m";
   protected static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
   protected static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
-  protected static final String UNIX_CLEAR = "\033[H\033[2J";
   private static final String TURN = "turn";
   private static final String BOARD = "board";
   private static final String BOARDS = "boards";
@@ -343,7 +342,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     if (!this.playerIterator.hasNext()) return null; //? if it still has nothing... there was an issue
     ServerThread player = this.playerIterator.next();
     if (!player.getGameBoard().hasShips()) {
-      sendGameMessage(player, String.format("%s You lost all your ships, but you can still watch as a spectator", UNIX_CLEAR));
+      sendGameMessage(player, "You lost all your ships, but you can still watch as a spectator");
       addSpectator(player);
       this.playerIterator.remove();
       return getNextPlayer();
@@ -361,6 +360,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
       p.setClientName("Game");
       p.setMessage("Place your ships, you have 3 minutes");
       p.setPlayerBoard(player.getGameBoard());
+      p.addPlayerData(player.getClientName(), getPlayer(player));
       for (ShipType type : shipCounts.keySet()) {
         for (int i = 0; i < shipCounts.get(type); i++) {
           Ship ship = new Ship(type);
@@ -413,8 +413,8 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         if (targetBoard.getPiece(x, y) == PieceType.SHIP) {
           printGameInfo(String.format("%sHit%s", ANSI_RED, ANSI_RESET));
 
-          privledgedMessageBuilder.append(String.format("\n  - You %sHit%s one of %s's ships on %s, %s", ANSI_RED, ANSI_ORANGE, name, y+1, x+1));
-          regularMessageBuilder.append(String.format("\n  - player.getClientName() %shit%s one of %s's ships", ANSI_RED, ANSI_ORANGE, name));
+          privledgedMessageBuilder.append(String.format("\n  - You hit one of %s's ships on %s, %s", name, y+1, x+1));
+          regularMessageBuilder.append(String.format("\n  - %s hit one of %s's ships", player.getClientName(), name));
 
           targetBoard.setPiece(x, y, PieceType.HIT);
           targetPlayer.decrementHealth();
@@ -423,8 +423,8 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         } else {
           printGameInfo(String.format("%sMiss%s", ANSI_RED, ANSI_RESET));
 
-          privledgedMessageBuilder.append(String.format("\n  - You %smissed%s while targeting %s on %s, %s", ANSI_YELLOW, ANSI_ORANGE, name, y+1, x+1));// TODO: DOUBLE CHECK NOT INVERTED
-          regularMessageBuilder.append(String.format("\n  - player.getClientName() %smissed%s while targeting %s", ANSI_YELLOW, ANSI_ORANGE, name));
+          privledgedMessageBuilder.append(String.format("\n  - You missed while targeting %s on %s, %s", name, y+1, x+1));
+          regularMessageBuilder.append(String.format("\n  - %s missed while targeting %s", player.getClientName(), name));
 
           targetBoard.setPiece(x, y, PieceType.MISS);
           attackingPlayer.incrementMisses();
@@ -484,6 +484,12 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     printGameInfo("Game Flow: turns starting");
 
     while (isRunning) {
+
+      if (currentPlayer == null) {
+        isRunning = false;
+        break;
+      }
+
       printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
       counterTimer = new countDown(() -> { 
         

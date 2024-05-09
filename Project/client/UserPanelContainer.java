@@ -1,22 +1,51 @@
 package Project.client;
 
 import Project.common.PlayerData;
+import java.awt.*;
+import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.awt.*;
-import java.awt.event.*;
 import javax.swing.*;
 
 public class UserPanelContainer extends JPanel {
+  private GUI gui;
   protected ArrayList<UserPanel> userPanels = new ArrayList<>();
 
-  public UserPanelContainer(HashMap<String, PlayerData> playerData) {
+  public UserPanelContainer(GUI gui, HashMap<String, PlayerData> playerData) {
     
     setLayout(new BoxLayout(this, BoxLayout.LINE_AXIS));
     setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-    add(Box.createHorizontalGlue());  
+    add(Box.createHorizontalGlue());
 
+    for (Map.Entry<String, PlayerData> entry : playerData.entrySet()) {
+      UserPanel tempUserPanel = new UserPanel(entry.getKey());
+      // tempUserPanel.setName(entry.getKey());
+      tempUserPanel.setHealth(entry.getValue().getHealth());
+      tempUserPanel.setPoints(entry.getValue().getScore());
+      tempUserPanel.setCurrency(entry.getValue().getCurrency());
+      tempUserPanel.setAccuracy(entry.getValue().getHits(), entry.getValue().getMisses());
+      tempUserPanel.setStatus(entry.getValue().isTurn(), entry.getValue().isAway());
+      userPanels.add(tempUserPanel);
+      add(tempUserPanel);
+    }
+  }
+
+  protected void updateUserPanels(HashMap<String, PlayerData> playerData) {
+    for (UserPanel userPanel : userPanels) {
+      PlayerData player = playerData.get(userPanel.getName().equals("Your") ? gui.getUserName() : userPanel.getName());
+      if(player == null) continue;
+      userPanel.setHealth(player.getHealth());
+      userPanel.setPoints(player.getScore());
+      userPanel.setCurrency(player.getCurrency());
+      userPanel.setAccuracy(player.getHits(), player.getMisses());
+      userPanel.setStatus(player.isTurn(), player.isAway());
+    }
+  }
+
+  protected void replaceAll(HashMap<String, PlayerData> playerData) {
+    removeAll();
+    userPanels.clear();
     for (Map.Entry<String, PlayerData> entry : playerData.entrySet()) {
       UserPanel tempUserPanel = new UserPanel(entry.getKey());
       tempUserPanel.setHealth(entry.getValue().getHealth());
@@ -27,21 +56,12 @@ public class UserPanelContainer extends JPanel {
       add(tempUserPanel);
     }
   }
-
-  protected void updateUserPanels(HashMap<String, PlayerData> playerData) {
-    for (UserPanel userPanel : userPanels) {
-      PlayerData player = playerData.get(userPanel.getName());
-      userPanel.setHealth(player.getHealth());
-      userPanel.setPoints(player.getScore());
-      userPanel.setCurrency(player.getCurrency());
-      userPanel.setAccuracy(player.getHits(), player.getMisses());
-    }
-  }
 }
 
 class UserPanel extends JPanel {
   private boolean infoPanelVisible = false;
   private int preferedWidth;
+  private String name;
   private JLabel nameLabel;
   private JLabel healthLabel;
   private JPanel statusPanel;
@@ -54,6 +74,7 @@ class UserPanel extends JPanel {
   private JPanel infoPanel;
 
   public UserPanel(String name) {
+    this.name = name;
     setLayout(new BorderLayout());
     add(Box.createVerticalGlue());
     setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
@@ -134,6 +155,9 @@ class UserPanel extends JPanel {
   private void setHits(int hits) { hitsLabel.setText("Hits: " + hits); }
 
   private void setMisses(int misses) { missesLabel.setText("Misses: " + misses); }
+
+  @Override
+  public String getName() { return this.name; }
 
   public void setAccuracy(int hits, int misses) {
     this.setHits(hits);
