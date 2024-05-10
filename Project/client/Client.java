@@ -89,7 +89,6 @@ public class Client {
   private String clientName = "";
   private List<Ship> ships = new ArrayList<>();
   private List<Ship> placedShips = new ArrayList<>();
-  private List<Integer[]> coords = new ArrayList<>();
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>();
   private Map<String, List<Integer[]>> coordinates = new HashMap<>();
@@ -335,8 +334,8 @@ public class Client {
       system_error("You have already targeted that location");
       return;
     }
-    coords.add(new Integer[]{row - 1, column - 1});
-    this.coordinates.put(target, coords);
+    if (this.coordinates.get(target) == null) this.coordinates.put(target, new ArrayList<>());
+    this.coordinates.get(target).add(new Integer[]{row - 1, column - 1});
     if (finishedAttack) opponentBoards.remove(target);
     // sendGameEvent(PayloadType.GAME_TURN, target, row - 1, column - 1);
     if (this.opponentBoards.isEmpty()) {
@@ -504,7 +503,6 @@ public class Client {
         this.isTurn = p.isTurn();
         this.placedShips = new ArrayList<>(); // reset turn-specific data
         this.coordinates = new HashMap<>();
-        this.coords = new ArrayList<>();
         this.playerBoard = new GameBoard(p.getPlayerBoard());
         this.playerBoard.setClientName("Your");
         this.opponentBoards = p.getOpponentBoardsMap();

@@ -39,9 +39,9 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   private Map<ShipType, Integer> shipCounts = Map.of( //! testing with fewer ships to save time
     ShipType.CARRIER, 0,
-    ShipType.BATTLESHIP, 0,
+    ShipType.BATTLESHIP, 1,
     ShipType.CRUISER, 0,
-    ShipType.SUBMARINE,  0,
+    ShipType.SUBMARINE,  2,
     ShipType.DESTROYER, 1,
     ShipType.LIFE_BOAT, 0
   );
