@@ -4,13 +4,14 @@ import Project.common.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch; //? Use a semaphore instead?
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledFuture; //? Use a semaphore instead?
 import java.util.concurrent.TimeUnit;
 
 public class BattleshipThread extends Thread { //? implement auto-closeable?
@@ -23,8 +24,8 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private countDown counterTimer;
   private ServerThread currentPlayer; //? make this volatile?
 
-  private List<ServerThread> players = new ArrayList<>();
-  private Iterator<ServerThread> playerIterator;
+  private ConcurrentLinkedQueue<ServerThread> playerOrder = new ConcurrentLinkedQueue<>();
+  private ConcurrentHashMap<ServerThread, PlayerData> players = new ConcurrentHashMap<>();
   private List<ServerThread> spectators = new ArrayList<>();
 
   // private Map<ShipType, Integer> shipCounts = Map.of(
@@ -38,14 +39,15 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
   private Map<ShipType, Integer> shipCounts = Map.of( //! testing with fewer ships to save time
     ShipType.CARRIER, 0,
-    ShipType.BATTLESHIP, 0,
+    ShipType.BATTLESHIP, 1,
     ShipType.CRUISER, 0,
-    ShipType.SUBMARINE,  0,
+    ShipType.SUBMARINE,  2,
     ShipType.DESTROYER, 1,
     ShipType.LIFE_BOAT, 0
   );
 
   protected static final String ANSI_RESET = "\u001B[0m";
+  protected static final String ANSI_ORANGE = "\u001B[38;2;255;165;0m";
   protected static final String ANSI_YELLOW = "\u001B[33m";
   protected static final String ANSI_RED = "\u001B[31m";
   protected static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
@@ -57,28 +59,38 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   private static final String SPECTATORS = "spectators";
   private static final String GAME = "game";
   private static final String LEAVE_GAME = "leave game";
+  private static final String AWAY = "away";
 
 
   public BattleshipThread(Room room, boolean hardDifficulty, boolean salvoGameMode, int playerCount) {
     this.hardDifficulty = hardDifficulty;
     this.salvoGameMode = salvoGameMode;
     this.room = room;
-    playerIterator = players.iterator();
     printGameInfo("Battleship game thread created");
-    counterTimer = new countDown(() -> { placementPhase(); }, playerCount < 4 ? playerCount : 4, 180);
+    counterTimer = new countDown(() -> { placementPhase(); }, playerCount < 4 ? playerCount : 4, 120);
   }
 
   protected static void printGameInfo(String message) { System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET); }
 
-  public void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
+  public synchronized void sendGameState(ServerThread player, PayloadType type, String message, String privledgedMessage) {
     Payload payload = new Payload();
+    for (Map.Entry<ServerThread, PlayerData> entry : players.entrySet()) {
+      if (entry.getKey().isAway()) entry.getValue().isAway(true);
+      else entry.getValue().isAway(false);
+      if (entry.getKey().isTurn()) {
+        entry.getValue().isTurn(true);
+        payload.setTurn(true);
+      } else entry.getValue().isTurn(false);
+    }
     payload.setPayloadType(type);
     payload.setClientName("Game"); //? should this be the client/player name?
+    payload.setRoomName(room.getName());
     payload.setMessage(message);
     payload.setNumber((long) (players.size() - 1));
-    for (ServerThread p : players) { 
+    // payload.setPlayerData(getPlayerMap(players));
+    payload.setPlayerDataWithList(getPlayerMapWithList(players));
+    for (ServerThread p : players.keySet()) { 
       if (p == null) continue;
-      if (p == currentPlayer) payload.setTurn(true);
       if (p == player) continue;
       payload.setPlayerBoard(p.getGameBoard());
       payload.setOpponentBoards(getOpponentBoards(p));
@@ -88,12 +100,11 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     payload.setOpponentBoards(getOpponentBoards(player));
     payload.setPlayerBoard(player.getGameBoard());
     player.sendGameEvent(payload);
-
-    for (ServerThread p : players) if (p != null) if (player != p) payload.addOpponentBoard(p.getClientName(), p.getGameBoard()); // let spectators see all board information
+    for (ServerThread p : players.keySet()) if (p != null) if (player != p) payload.addOpponentBoard(p.getClientName(), p.getGameBoard()); // let spectators see all board information
     for (ServerThread spec : spectators) if (spec != null) spec.sendGameEvent(payload);
   }
 
-  public void sendGameMessage(ServerThread player, String message) {
+  public synchronized void sendGameMessage(ServerThread player, String message) {
     Payload payload = new Payload();
     payload.setPayloadType(PayloadType.MESSAGE);
     payload.setClientName("Game");
@@ -101,12 +112,12 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     player.sendGameEvent(payload);
   }
 
-  public void sendGameMessage(String message) {
+  public synchronized void sendGameMessage(String message) {
     Payload payload = new Payload();
     payload.setPayloadType(PayloadType.MESSAGE);
     payload.setClientName("Game");
     payload.setMessage(message);
-    for (ServerThread player : players) player.sendGameEvent(payload);
+    for (ServerThread player : players.keySet()) player.sendGameEvent(payload);
     for (ServerThread spectator : spectators) spectator.sendGameEvent(payload);
   }
 
@@ -127,7 +138,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
       case BOARDS -> {
         StringBuilder sb = new StringBuilder();
         sb.append("Boards: \n");
-        for (ServerThread p : players) {
+        for (ServerThread p : players.keySet()) {
           if (p == null) continue;
           sb.append(p.getGameBoard().getProtectedCopy().toString()).append("  ");
           for (int i = 0; i < 30; i++) sb.append("-");
@@ -138,7 +149,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
       case PLAYERS -> {
         StringBuilder sb = new StringBuilder();
         sb.append("Players: ");
-        for (ServerThread p : players) {
+        for (ServerThread p : players.keySet()) {
           if (p == null) continue;
           sb.append("\n  - ").append(p.getClientName());
         }
@@ -155,7 +166,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
       }
       case GAME -> sendGameMessage(player, String.format("You are in room: %s, playing game: %s, which is currerntly in: %s phase", room.getName(), this.threadId(), phase));
       case LEAVE_GAME -> {
-        if (players.contains(player)) {
+        if (players.keySet().contains(player)) {
           sendGameMessage(player, "You have left the game");
           removePlayer(player);
           sendGameMessage(player.getClientName() + " has left the game");
@@ -166,6 +177,10 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
         } else {
           sendGameMessage(player, "You are not in the game");
         }
+      }
+      case AWAY -> this.currentPlayer = getNextPlayer();
+      case "multishot" -> {
+        players.get(player).decrementCurrency(10);
       }
       default -> sendGameMessage(player, "Invalid command");
     }
@@ -220,10 +235,10 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
             sendGameMessage(player, "You must target at least one location");
             return;
           }
-          if (!salvoGameMode && coordinates.size() > 1) {
-            sendGameMessage(player, "You can only target one location in Classic mode");
-            return;
-          }
+          // if (!salvoGameMode && coordinates.size() > 1) {
+          //   sendGameMessage(player, "You can only target one location in Classic mode");
+          //   return;
+          // }
           if (getPlayer(name) == null) {
             sendGameMessage(player, "Invalid target");
             return;
@@ -236,6 +251,8 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
               sendGameMessage(player, "Invalid coordinates");
               return;
             } else if (targetBoard.getPiece(x, y) == PieceType.HIT || targetBoard.getPiece(x, y) == PieceType.MISS) {
+
+              System.out.println("\n\ntargetting (" + x + "," + y + "): " + targetBoard + "\n\n and it found: " + targetBoard.getPiece(x, y) + "\n");
               sendGameMessage(player, "You have already targeted that location");
               return;
             }
@@ -247,47 +264,80 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     }
   }
 
-  public String getPhase() { return phase; }
+  public synchronized String getPhase() { return phase; }
 
-  protected synchronized void addPlayer(ServerThread player) { 
+  protected synchronized void addPlayer(ServerThread player) {
     if (!started) {
-      players.add(player);
+      int health = 0;
+      for (ShipType shipType : shipCounts.keySet()) for (int i=0; i<shipCounts.get(shipType); i++) health += shipType.getLength();
+      PlayerData tempPlayer = new PlayerData(health);
+      players.put(player, tempPlayer);
       counterTimer.decrement();
     }
   }
 
-  protected synchronized void addSpectator(ServerThread spectator) { spectators.add(spectator); }
+  protected synchronized void addSpectator(ServerThread spectator) {
+    spectator.isSpectator(true);
+    spectators.add(spectator);
+  }
 
   protected synchronized void removePlayer(ServerThread player) { 
     players.remove(player); 
+    playerOrder.remove(player);
   }
 
-  protected synchronized void removeSpectator(ServerThread spectator) { spectators.remove(spectator); }
+  protected synchronized void removeSpectator(ServerThread spectator) { 
+    spectator.isSpectator(false);
+    spectators.remove(spectator); 
+  }
 
-  protected boolean hasPlayer(ServerThread player) { return players.contains(player);}
+  protected synchronized void nextPlayer () {
+    this.currentPlayer = getNextPlayer();
+  }
 
-  protected boolean hasPlayer(String name) {
-    for (ServerThread player : players) if (player.getClientName().equals(name)) return true;
+  protected synchronized boolean hasPlayer(ServerThread player) { return players.keySet().contains(player);}
+
+  protected synchronized boolean hasPlayer(String name) {
+    for (ServerThread player : players.keySet()) if (player.getClientName().equals(name)) return true;
     return false;
   }
 
-  protected boolean hasSpectator(ServerThread spectator) { return spectators.contains(spectator); }
+  protected synchronized boolean hasSpectator(ServerThread spectator) { return spectators.contains(spectator); }
 
-  protected boolean hasSpectator(String name) {
+  protected synchronized boolean hasSpectator(String name) {
     for (ServerThread spectator : spectators) if (spectator.getClientName().equals(name)) return true;
     return false;
   }
 
-  protected List<ServerThread> getPlayers() { return players; }
+  protected synchronized List<ServerThread> getPlayers() { 
+    List<ServerThread> plyrs = new ArrayList<>();
+    for (ServerThread player : players.keySet()) plyrs.add(player);
+    return plyrs; 
+  }
 
-  protected ServerThread getPlayer(String name) {
-    for (ServerThread player : players) if (player.getClientName().equals(name)) return player;
+  protected synchronized ServerThread getPlayer(String name) {
+    for (ServerThread player : players.keySet()) if (player.getClientName().equals(name)) return player;
     return null;
   }
 
-  private Map<String, GameBoard> getOpponentBoards(ServerThread player) {
+  private synchronized PlayerData getPlayer(ServerThread player) { return players.get(player); }
+
+
+  private synchronized Map<String, PlayerData> getPlayerMap(Map<ServerThread, PlayerData> p) {
+    Map<String, PlayerData> playerdata = new HashMap<>();
+    for (ServerThread player : p.keySet()) playerdata.put(player.getClientName(), p.get(player));
+    return playerdata;
+  }
+
+  private synchronized Map<String, Integer[]> getPlayerMapWithList(Map<ServerThread, PlayerData> p) {
+    Map<String, Integer[]> playerdata = new HashMap<>();
+    for (Map.Entry<ServerThread, PlayerData> entry : p.entrySet()) playerdata.put(entry.getKey().getClientName(), entry.getValue().getStats());
+    return playerdata;
+  }
+
+  private synchronized Map<String, GameBoard> getOpponentBoards(ServerThread player) {
     Map<String, GameBoard> boards = new HashMap<>();
-    for (ServerThread opponent : players) {
+    for (ServerThread opponent : players.keySet()) {
       if (opponent == player) continue;
       GameBoard board = opponent.getGameBoard().getProtectedCopy();
       board.setClientName(opponent.getClientName() + "'s");
@@ -296,7 +346,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     return boards;
   }
 
-  private boolean validateShipCounts(List<Ship> ships) { 
+  private synchronized boolean validateShipCounts(List<Ship> ships) { 
     Map<ShipType, Integer> tempShipCounts = new HashMap<>(shipCounts);
     for (Ship ship : ships) {
       if (tempShipCounts.get(ship.getType()) == 0) return false;
@@ -305,34 +355,49 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     return true;
   }
 
-  private boolean validateShipPlacements(List<Ship> ships, GameBoard gameBoard) {
+  private synchronized boolean validateShipPlacements(List<Ship> ships, GameBoard gameBoard) {
     if (gameBoard == null) return false;
     GameBoard tempGameBoard = new GameBoard(gameBoard);
     for (Ship ship : ships) if (!tempGameBoard.placeShip(ship)) return false;
     return true;
   }
 
-  private ServerThread getNextPlayer() {
-    if (!playerIterator.hasNext()) playerIterator = players.iterator();
-    ServerThread player = playerIterator.next();
-    if (!player.getGameBoard().hasShips()) {
-      removePlayer(player);
-      addSpectator(player);
-      return getNextPlayer();
+  private synchronized ServerThread getNextPlayer() {
+    currentPlayer.isTurn(false);
+    playerOrder.remove(currentPlayer);
+    playerOrder.add(currentPlayer);
+    for (ServerThread player : playerOrder) {
+      if (!player.getGameBoard().hasShips()) {
+        sendGameMessage(player, "You lost all your ships, but you can still watch as a spectator");
+        addSpectator(player);
+        removePlayer(player);
+        playerOrder.remove(player);
+      } else {
+        if (player.isAway()) {
+          sendGameMessage(player, "You are away, you will be skipped this turn");
+          continue;
+        }
+        player.isTurn(true);
+        players.get(player).incrementCurrency();
+        playerOrder.remove(player);
+        playerOrder.add(player);
+        return player;
+      }
     }
-    return player;
+    return null;
   }
 
   private void placementPhase() {
     if(players.size() < 2 || players.size() > 4) return;
     printGameInfo("Begin placmemnt phase");
     phase = "placement";
-    for (ServerThread player : players) {      
+    for (ServerThread player : players.keySet()) {      
       Payload p = new Payload();
       p.setPayloadType(PayloadType.GAME_PLACE);
       p.setClientName("Game");
       p.setMessage("Place your ships, you have 3 minutes");
       p.setPlayerBoard(player.getGameBoard());
+      p.addPlayerData(player.getClientName(), getPlayer(player));
       for (ShipType type : shipCounts.keySet()) {
         for (int i = 0; i < shipCounts.get(type); i++) {
           Ship ship = new Ship(type);
@@ -348,15 +413,19 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     printGameInfo("Begin game phase");
     phase = "game";
     started = true;
-    for (ServerThread player : players) sendGameMessage(player, "The game has started"); //? unnecessary?
+    for (ServerThread player : players.keySet()) sendGameMessage(player, "The game has started"); //? unnecessary?
 
-    Collections.shuffle(players);
+    List<ServerThread> shuffledPlayers = new ArrayList<>(players.keySet());
 
-    printGameInfo("The player order is: ");
-    for (ServerThread player : players) printGameInfo("  - " + player.getClientName());
+    Collections.shuffle(shuffledPlayers);
 
-    playerIterator = players.iterator();
-    currentPlayer = getNextPlayer();
+    System.out.println("The player order is: ");
+    for (ServerThread p : shuffledPlayers) System.out.println("  - " + p.getClientName());
+
+    playerOrder.addAll(shuffledPlayers);
+    
+    currentPlayer = playerOrder.peek();
+    currentPlayer.isTurn(true);
 
     printGameInfo("The current player is: " + currentPlayer.getClientName());
 
@@ -364,33 +433,53 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
   }
 
   private synchronized void handleAttack(ServerThread player, Map<String, List<Integer[]>> targetCoordinates) {
-    if (currentPlayer == null) currentPlayer = player;
     if (player != currentPlayer) return;
-
+    PlayerData attackingPlayer = getPlayer(player);
+    StringBuilder regularMessageBuilder = new StringBuilder();
+    StringBuilder privledgedMessageBuilder = new StringBuilder();
     printGameInfo(player.getClientName() + " is executing their attack (validated)");
 
+    regularMessageBuilder.append(player.getClientName());
+    privledgedMessageBuilder.append("You:");
+
     printGameInfo(String.format("Player Board for %s:\n%s", player.getClientName(), player.getGameBoard().toString()));
+    printGameInfo(String.format("Initial statistics for %s: %s", player.getClientName(), attackingPlayer.toString()));
 
     for (String name : targetCoordinates.keySet()) {
       List<Integer[]> coordinates = targetCoordinates.get(name);
       GameBoard targetBoard = getPlayer(name).getGameBoard();
+      PlayerData targetPlayer = getPlayer(getPlayer(name));
       for (Integer[] coordinate : coordinates) {
         int x = coordinate[0];
         int y = coordinate[1];
         printGameInfo("Targeting " + name + " at " + x + ", " + y);
         if (targetBoard.getPiece(x, y) == PieceType.SHIP) {
           printGameInfo(String.format("%sHit%s", ANSI_RED, ANSI_RESET));
+
+          privledgedMessageBuilder.append(String.format("\n  - You hit one of %s's ships on %s, %s", name, y+1, x+1));
+          regularMessageBuilder.append(String.format("\n  - %s hit one of %s's ships", player.getClientName(), name));
+
           targetBoard.setPiece(x, y, PieceType.HIT);
-          sendGameState(player, PayloadType.MESSAGE, String.format("%s hit one of %s's ships", player.getClientName(), name), String.format("You hit one of %s's ships on %s, %s", name, x+1, y+1));
+          targetPlayer.decrementHealth();
+          attackingPlayer.incrementHits();
+          attackingPlayer.incrementScore();
+          attackingPlayer.incrementCurrency(3);
         } else {
           printGameInfo(String.format("%sMiss%s", ANSI_RED, ANSI_RESET));
+
+          privledgedMessageBuilder.append(String.format("\n  - You missed while targeting %s on %s, %s", name, y+1, x+1));
+          regularMessageBuilder.append(String.format("\n  - %s missed while targeting %s", player.getClientName(), name));
+
           targetBoard.setPiece(x, y, PieceType.MISS);
-          sendGameState(player, PayloadType.MESSAGE, String.format("%s missed while targeting %s", player.getClientName(), name), String.format("Your shot at %s on %s, %s missed", name, y+1, x+1));
+          attackingPlayer.incrementMisses();
         }
         printGameInfo(String.format("Target Board for %s:\n%s", name, targetBoard.toString()));
+        printGameInfo(String.format("Statistics for %s: %s", name, targetPlayer.toString()));
       }
       counterTimer.decrement();
     }
+    printGameInfo(String.format("Final statistics for %s: %s", player.getClientName(), attackingPlayer.toString()));
+    sendGameState(player, PayloadType.MESSAGE, regularMessageBuilder.toString(), privledgedMessageBuilder.toString());
   }
 
   @Override
@@ -422,7 +511,7 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
 
     counterTimer = new countDown(() -> { gamePhaseInitializer(); }, () -> { 
       gamePhaseInitializer(); 
-      for (ServerThread player : players) {
+      for (ServerThread player : players.keySet()) {
         if (!player.getGameBoard().hasShips()) {
           sendGameMessage(player, "You have not placed your ships");
           addSpectator(player);
@@ -439,27 +528,42 @@ public class BattleshipThread extends Thread { //? implement auto-closeable?
     printGameInfo("Game Flow: turns starting");
 
     while (isRunning) {
-      printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
 
+      if (currentPlayer == null) {
+        isRunning = false;
+        break;
+      }
+
+      printGameInfo("Waiting for " + currentPlayer.getClientName() + " to take their turn");
       counterTimer = new countDown(() -> { 
+        
         printGameInfo("The old current player was: " + ANSI_RED + currentPlayer.getClientName() + ANSI_YELLOW + " and they have finished their turn");
+        
         currentPlayer = getNextPlayer();
-        sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
+        
+        if (currentPlayer != null) sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
+        else isRunning = false;
+      
       }, () -> {
+        
         printGameInfo("The old current player was: " + ANSI_RED + currentPlayer.getClientName() + ANSI_YELLOW+ " and they have run out of time");
-        sendGameMessage(currentPlayer, "Unfortunatley, you have run out of time, you will be skipped this turn");
+        sendGameMessage(currentPlayer, "Unfortunately, you have run out of time, you will be skipped this turn");
+        
         currentPlayer = getNextPlayer();
-        sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
-      }, players.size() - 1, 60);
+
+        if (currentPlayer != null) sendGameState(currentPlayer, PayloadType.GAME_STATE, String.format("Its %s's turn.", currentPlayer.getClientName()), "It is your turn");
+        else isRunning = false;
+
+      }, players.size() - 1, 120);
         if (players.size() <= 1) break;
         counterTimer.runLambdas();
     }
 
-    sendGameMessage("The game has ended, there is only one player left: " + players.get(0).getClientName());
-    removePlayer(players.get(0));
+    sendGameMessage("The game has ended, thanks for playing!");
+    cleanup();
 
-    isRunning = false;
   }
+
   protected void cleanup() {
     counterTimer.close();
     counterTimer = null;
@@ -550,7 +654,7 @@ class countDown { //? implement auto-closeable?
     if (executor != null) {
       executor.shutdown();
       try {
-        if (!executor.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+        if (!executor.awaitTermination(750, TimeUnit.MILLISECONDS)) {
           executor.shutdownNow();
         } 
       } catch (InterruptedException e) {
