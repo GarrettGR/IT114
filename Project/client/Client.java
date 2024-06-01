@@ -19,9 +19,12 @@ public class Client {
   Socket server = null;
   ObjectOutputStream out = null;
   ObjectInputStream in = null;
+  GUI gui = null;
 
   public static final String ANSI_RESET = "\u001B[0m";
   public static final String ANSI_YELLOW = "\u001B[33m";
+  public static final String ANSI_GREEN = "\u001B[32m";
+  public static final String ANSI_ORANGE = "\u001B[38;2;255;165;0m";
   public static final String ANSI_RED = "\u001B[31m";
   public static final String ANSI_GRAY_BG = "\u001B[48;2;35;35;35m";
   public static final String ANSI_GRAY = "\u001B[38;2;150;150;150m";
@@ -85,10 +88,14 @@ public class Client {
   private GameBoard playerBoard = new GameBoard();
   private Map<String, GameBoard> opponentBoards = new HashMap<>();
   private Map<String, List<Integer[]>> coordinates = new HashMap<>();
+  private Map<String, PlayerData> playerdata = new HashMap<>();
 
   // --- Start of Boilerplate ---
 
-  public Client() { system_print("Client Created"); }
+  public Client() { 
+    this.gui = new GUI(this);
+    system_print("Client Created"); 
+  }
 
   public void start() throws IOException { listenForKeyboard(); }
 
@@ -101,6 +108,8 @@ public class Client {
     }
   }
 
+  public String getClientName() { return clientName; }
+
   // --- Start of Checkers ---
 
   public boolean isConnected() {
@@ -112,28 +121,44 @@ public class Client {
 
   // --- Start of Formatters ---
 
-  public static void server_print(String message) {
+  public void server_print(String message) {
     if (message.startsWith("Server:")) {
       System.out.println(ANSI_GRAY_BG + ANSI_YELLOW + message + ANSI_RESET);
-    } else {
+      gui.ingestMessage(message);
+    } else if (message.startsWith("Game:") || message.startsWith("Room:")) { 
+      System.out.println(ANSI_GRAY_BG + ANSI_ORANGE + message + ANSI_RESET);
+      gui.ingestMessage(message);
+    } else { 
       System.out.println(ANSI_GRAY_BG + message + ANSI_RESET);
+      gui.ingestMessage(message);
     }
   }
 
-  public static void system_print(String message) { System.out.println(ANSI_YELLOW + message + ANSI_RESET); }
+  public void system_print(String message) { 
+    System.out.println(ANSI_YELLOW + message + ANSI_RESET); 
+    gui.ingestMessage(message);
+  }
 
-  public static void system_error(String message) { System.out.println(ANSI_RED + message + ANSI_RESET); }
+  public void system_error(String message) { 
+    System.out.println(ANSI_RED + message + ANSI_RESET); 
+    gui.ingestMessage(message);
+  }
 
-  public static void game_print(String message) { System.out.print(ANSI_GRAY + message + ANSI_RESET);}
+  public void game_print(String message) { 
+    System.out.print(ANSI_GRAY + message + ANSI_RESET);
+    gui.ingestMessage(message);
+  }
 
   private void drawGame(GameBoard playerBoard, GameBoard[] opponentBoards, String message) {
-    System.out.print(UNIX_CLEAR);
     for (GameBoard board : opponentBoards) {
       System.out.print(board.toString() + "  ");
-      for (int i = 0; i < 30; i++) game_print("-");
+      for (int i = 0; i < 30; i++) System.out.print("-");
       System.out.println();
+      PlayerData playerData = playerdata.get(board.getClientName().substring(0, board.getClientName().length() - 2));
+      if (playerData != null) System.out.println(String.format("%s statistics: %s", board.getClientName(), playerData.toString()));
     }
     System.out.print(playerBoard.toString());
+    System.out.println(String.format("%s statistics: %s", playerBoard.getClientName(), playerdata.get(this.clientName)));
     system_print(message);
   }
 
@@ -146,6 +171,7 @@ public class Client {
       case "/connect":
         if (isConnected()) {
           system_error("Already connected to a server");
+          gui.updateConnection(true);
           return true;
         } else if (!isConnection(text)) {
           system_error("Invalid connection command");
@@ -153,7 +179,7 @@ public class Client {
         }
         if (clientName.isBlank()) system_print("You can set your name by using: /name [username]");
         String[] connectionParts = parts[1].split(":");
-        connect(connectionParts[0].trim(), Integer.parseInt(connectionParts[1].trim()));
+        gui.updateConnection((connect(connectionParts[0].trim(), Integer.parseInt(connectionParts[1].trim()))));
         return true;
       case "/quit":
         isRunning = false;
@@ -165,6 +191,7 @@ public class Client {
           else system_print("Your name is: " + clientName);
         } else {
           clientName = parts[1];
+          gui.updateName();
           system_print("Name set to: " + clientName);
         }
         return true;
@@ -223,7 +250,7 @@ public class Client {
     }
   }
 
-  private void placeShips(String[] parts) { //place [ship] [row] [column] [direction]
+  private void placeShips(String[] parts) {
     boolean validType = false;
     boolean hasShip = false;
     if (parts.length != 5) {
@@ -242,10 +269,10 @@ public class Client {
     }
     for (Ship ship : ships) {
       if (ship.getType().getName().equalsIgnoreCase(parts[1])) {
-        int x = Integer.parseInt(parts[3]) - 1;
-        int y = Integer.parseInt(parts[2]) - 1;
-        ship.setAnchorY(y);
-        ship.setAnchorX(x);
+        int x = Integer.parseInt(parts[3]);
+        int y = Integer.parseInt(parts[2]);
+        ship.setAnchorY(y - 1);
+        ship.setAnchorX(x - 1);
         ship.setOrientation(parts[4].toLowerCase());
         if (!playerBoard.placeShip(ship)) {
           system_error("Invalid ship placement");
@@ -254,7 +281,7 @@ public class Client {
         placedShips.add(ship);
         system_print("Placed " + ship.getType().getName() + " at " + y + ", " + x + " facing " + parts[4]);
         ships.remove(ship);
-        System.out.print(playerBoard.toString());
+        System.out.println(playerBoard.toString());
         break;
       }
     }
@@ -348,6 +375,16 @@ public class Client {
     }
   }
 
+  protected void handleMessage(String line) throws IOException {
+    if (!processCommand(line)) {
+      if (isConnected()) {
+        if (line != null && line.trim().length() > 0) sendMessage(line);
+      } else {
+        system_error("Not connected to server");
+      }
+    }
+  }
+
   private void listenForKeyboard() {
     inputThread = new Thread() {
       @Override
@@ -359,13 +396,7 @@ public class Client {
           while (isRunning) {
             try {
               line = si.nextLine();
-              if (!processCommand(line)) {
-                if (isConnected()) {
-                  if (line != null && line.trim().length() > 0) sendMessage(line);
-                } else {
-                  system_error("Not connected to server");
-                }
-              }
+              handleMessage(line);
             } catch (Exception e) {
               system_error("Connection dropped");
               break;
@@ -388,7 +419,7 @@ public class Client {
       public void run() {
         try {
           Payload fromServer;
-          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processMessage(fromServer);
+          while (!server.isClosed() && !server.isInputShutdown() && (fromServer = (Payload) in.readObject()) != null) processPayload(fromServer);
           system_error("Loop exited");
         } catch (Exception e) {
           e.printStackTrace();
@@ -415,11 +446,14 @@ public class Client {
     opponentBoards = new HashMap<>();
   }
 
-  private void processMessage(Payload p) {
+  private void processPayload(Payload p) {
     switch (p.getPayloadType()) {
       case CONNECT, DISCONNECT -> system_print(String.format("*%s %s*", p.getClientName(), p.getMessage()));
       case MESSAGE -> {
-        if (p.isRename()) this.clientName = p.getMessage().split(" ")[p.getMessage().split(" ").length - 1];
+        if (p.isRename()) { 
+          this.clientName = p.getMessage().split(" ")[p.getMessage().split(" ").length - 1];
+          gui.updateName();
+        }
         server_print(String.format("%s: %s", p.getClientName(), p.getMessage()));
       }
       case GAME_PLACE -> {
@@ -428,7 +462,13 @@ public class Client {
         ships = p.getShipList();
         playerBoard.setBoard(p.getPlayerBoard());
         playerBoard.setClientName("Your");
-        System.out.print(p.getMessage() + '\n' + playerBoard.toString());
+        System.out.println(p.getMessage() + '\n' + playerBoard.toString());
+        gui.ingestMessage(p.getMessage());
+        HashMap<String, GameBoard> tempBoard = new HashMap<>();
+        HashMap<String, PlayerData> tempData = new HashMap<>();
+        tempBoard.put(this.clientName, this.playerBoard);
+        tempData.put(this.clientName, p.getPlayerData(this.clientName));
+        gui.ingestData(tempData, tempBoard);
         printShips();
       }
       case GAME_STATE -> {
@@ -443,7 +483,16 @@ public class Client {
         this.playerBoard = new GameBoard(p.getPlayerBoard());
         this.playerBoard.setClientName("Your");
         this.opponentBoards = p.getOpponentBoardsMap();
+        this.playerdata = p.getPlayerDataMap();
 
+        HashMap<String, GameBoard> tempBoard = new HashMap<>();
+        HashMap<String, PlayerData> tempData = new HashMap<>();
+
+        tempData.putAll(this.playerdata);
+        tempBoard.putAll(this.opponentBoards);
+        tempBoard.put(this.clientName, this.playerBoard);
+
+        gui.ingestData(tempData, tempBoard);
         drawGame(this.playerBoard, p.getOpponentBoards(), p.getMessage());
       }
       case PING -> { /* do nothing */ }

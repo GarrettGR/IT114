@@ -28,7 +28,7 @@ public class ServerThread extends Thread {
     this.currentRoom = room;
   }
 
-  protected void setClientName(String name) {
+  protected synchronized void setClientName(String name) {
     Payload payload = new Payload();
     payload.setPayloadType(PayloadType.MESSAGE);
     payload.setRename(true);
@@ -45,7 +45,7 @@ public class ServerThread extends Thread {
     send(payload);
   }
 
-  protected String getClientName() { return clientName; }
+  protected synchronized String getClientName() { return clientName; }
 
   protected synchronized Room getCurrentRoom() {  return currentRoom;  }
 
@@ -62,25 +62,25 @@ public class ServerThread extends Thread {
 
   protected synchronized GameBoard getGameBoard() { return this.gameBoard; }
 
-  protected boolean inGame() { return inGame; }
+  protected synchronized boolean inGame() { return inGame; }
 
-  protected void inGame(boolean inGame) { this.inGame = inGame; }
+  protected synchronized void inGame(boolean inGame) { this.inGame = inGame; }
 
-  protected boolean isAway() { return isAway; }
+  protected synchronized boolean isAway() { return isAway; }
 
-  protected void isAway(boolean isAway) { this.isAway = isAway; }
+  protected synchronized void isAway(boolean isAway) { this.isAway = isAway; }
 
-  protected boolean isReady() { return isReady; }
+  protected synchronized boolean isReady() { return isReady; }
 
-  protected void isReady(boolean isReady) { this.isReady = isReady; }
+  protected synchronized void isReady(boolean isReady) { this.isReady = isReady; }
 
-  protected boolean isTurn() { return isTurn; }
+  protected synchronized boolean isTurn() { return isTurn; }
 
-  protected void isTurn(boolean isTurn) { this.isTurn = isTurn; }
+  protected synchronized void isTurn(boolean isTurn) { this.isTurn = isTurn; }
 
-  protected boolean isSpectator() { return isSpectator; }
+  protected synchronized boolean isSpectator() { return isSpectator; }
 
-  protected void isSpectator(boolean isSpectator) { this.isSpectator = isSpectator; }
+  protected synchronized void isSpectator(boolean isSpectator) { this.isSpectator = isSpectator; }
 
   public void disconnect() {
     info("Thread being disconnected by server");
@@ -96,8 +96,8 @@ public class ServerThread extends Thread {
     return send(p);
   }
 
-  public void sendGameEvent(Payload p) {
-    System.out.println("Sending game event: " + p + "\n to room: " + currentRoom.getName());
+  public synchronized void sendGameEvent(Payload p) {
+    info("Sending game event: \n" + p + "\nto room: " + currentRoom.getName());
     send(p);
   }
 
@@ -109,7 +109,7 @@ public class ServerThread extends Thread {
 
   protected String createClientName() {
     String name = currentRoom.getUniqueName();
-    System.out.println("Auto-generated name for client: " + name);
+    info("Auto-generated name for client: " + name);
     return name;
   }
 
@@ -144,9 +144,10 @@ public class ServerThread extends Thread {
       this.out = out;
       isRunning = true;
       Payload fromClient;
-      while (isRunning && (fromClient = (Payload) in.readObject()) != null) processMessage(fromClient);
+      while (isRunning && (fromClient = (Payload) in.readObject()) != null) processPayload(fromClient);
     } catch (Exception e) {
       e.printStackTrace();
+      currentRoom.removeClient(this);
       info("Client disconnected");
     } finally {
       isRunning = false;
@@ -155,7 +156,7 @@ public class ServerThread extends Thread {
     }
   }
 
-  void processMessage(Payload p) {
+  void processPayload(Payload p) {
     info("Received: " + p);
     switch (p.getPayloadType()) {
       case CONNECT -> setClientName(p.getClientName());

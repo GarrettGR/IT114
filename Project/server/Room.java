@@ -26,6 +26,7 @@ public class Room implements AutoCloseable {
   private final static String PM = "pm";
   private final static String GAME_PLAY = "creategame";
   private final static String GAME_LIST = "games";
+  private final static String SPECTATE = "spectate";
 
   public Room(String name) {
     this.name = name;
@@ -61,6 +62,7 @@ public class Room implements AutoCloseable {
   protected synchronized void removeClient(ServerThread client) {
     if (!isRunning) return;
     clients.remove(client);
+    removeFromGame(client);
     if (!clients.isEmpty()) sendConnectionStatus(client, false);
     checkClients();
   }
@@ -69,9 +71,27 @@ public class Room implements AutoCloseable {
 
   protected synchronized void removeGame(BattleshipThread game) { games.remove(game); }
 
-  protected List<ServerThread> getClients() { return clients; }
+  protected synchronized void removeFromGame(ServerThread client) {
+    List<BattleshipThread> gamesToRemove = new ArrayList<>();
+    for (BattleshipThread game : games) {
+      if (game.hasPlayer(client)) {
+        game.removePlayer(client);
+        if (game.getPlayers().isEmpty()) {
+          gamesToRemove.add(game);
+          game.cleanup();
+        }
+        info("Removed client: " + client.getClientName() + " from game: " + game.threadId());
+      }
+    }
+    if (!gamesToRemove.isEmpty()){
+      games.removeAll(gamesToRemove);
+      info("Removed " + gamesToRemove.size() + " game(s): " + gamesToRemove);
+    }
+  }
 
-  protected List<BattleshipThread> getGames() { return games; }
+  protected synchronized List<ServerThread> getClients() { return clients; }
+
+  protected synchronized List<BattleshipThread> getGames() { return games; }
 
   protected String getUniqueName() { return server.generateUniqueName(); }
 
@@ -106,7 +126,7 @@ public class Room implements AutoCloseable {
             StringBuilder rooms = new StringBuilder();
             rooms.append("Rooms:");
             for (String room : server.listRoomNames())
-              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n").append(room).append(" (").append(server.getRoom(room).getClients().size()).append(")");
+              if (!room.equalsIgnoreCase("lobby")) rooms.append("\n  - ").append(room).append(" (").append(server.getRoom(room).getClients().size()).append(")");
             client.sendMessage("Server", rooms.toString());
             break;
           case ROOM:
@@ -131,7 +151,11 @@ public class Room implements AutoCloseable {
               client.sendMessage("Server", "Name already taken");
             }
             break;
-          case PM:           
+          case PM:
+            if(client.isSpectator()) {
+              client.sendMessage("Server", "You can't send private messages as a spectator");
+              break;
+            }
             List<ServerThread> targets = new ArrayList<>();
             List<String> targetNames = new ArrayList<>();
             StringBuilder privMsg = new StringBuilder();
@@ -237,6 +261,17 @@ public class Room implements AutoCloseable {
           //     }
           //   }
           //   break;
+          case SPECTATE:
+            int gameId = Integer.parseInt(comm2[1]);
+            for (BattleshipThread game : games) {
+              if (game.threadId() == gameId) {
+                if (game.hasPlayer(client)) game.removePlayer(client);
+                game.addSpectator(client);
+                client.isSpectator(true);
+                break;
+              }
+            }
+            break;
           case "turn", "board", "boards", "players", "spectators", "game", "leavegame":
             for (BattleshipThread game : games)
               if (game.hasPlayer(client)) {
@@ -344,19 +379,8 @@ public class Room implements AutoCloseable {
   }
 
   private void handleDisconnect(Iterator<ServerThread> iter, ServerThread client) {
-    List<BattleshipThread> gamesToRemove = new ArrayList<>();
-    for (BattleshipThread game : games) {
-      if (game.hasPlayer(client)) {
-        game.removePlayer(client);
-        if (game.getPlayers().isEmpty()) {
-          gamesToRemove.add(game);
-          game.cleanup();
-        }
-      }
-    }
-    games.removeAll(gamesToRemove);
+    removeFromGame(client);
     iter.remove();
-    info("Removed game(s): " + gamesToRemove.size());
     info("Removed client " + client.getClientName());
     checkClients();
     sendMessage(null, client.getClientName() + " disconnected");
@@ -365,7 +389,7 @@ public class Room implements AutoCloseable {
   @Override
   public void close() {
     server.removeRoom(this);
-    server = null;
+    // server = null; // Was making server null for all rooms
     isRunning = false;
     clients = null;
   }
